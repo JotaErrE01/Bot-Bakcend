@@ -1,0 +1,8 @@
+ngrok
+node_modules/
+package-lock.json
+.env
+ngrok.yml
+tunel.js
+source.txt
+dist/
