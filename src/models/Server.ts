@@ -1,5 +1,5 @@
 import express, { Application } from 'express';
-import cors from 'cors';
+// import cors from 'cors';
 import { webHookRouter } from '../routes';
 
 class Server {
@@ -14,10 +14,10 @@ class Server {
   }
 
   middlewares() {
-    // habilitar el cors
-    this.app.use(cors({
-      origin: '*',
-    }));
+    // ? TODO: is required habilitar el cors
+    // this.app.use(cors({
+    //   origin: '*',
+    // }));
 
     // lectura del body
     this.app.use(express.json());
@@ -29,7 +29,7 @@ class Server {
 
   listen() {
     this.app.listen(this.port, () => {
-      console.log(`Server running on port ${this.port}`);
+      console.log(`🚀 Server running on port ${this.port} 🚀`);
     })
   }
 

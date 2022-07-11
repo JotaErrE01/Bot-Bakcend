@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Cabecera {
+  id           Int          @id @default(autoincrement())
+  texto        String?
+  imagen       String?
+  documento    String?
+  video        String?
+  typoCabecera TypoCabecera @default(TEXT)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime
+  Mensajes     Mensaje?
+
+  @@map("Cabeceras")
+}
+
+model Cliente {
+  id                   Int      @id @default(autoincrement())
+  nombre               String
+  ultimaConversacionId Int?     @unique
+  ultimoMensajeId      Int?     @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime
+  email                String?
+  whatsapp             String   @unique
+  Mensajes             Mensaje? @relation(fields: [ultimoMensajeId], references: [id])
+
+  @@map("Clientes")
+}
+
+model Mensaje {
+  id             Int       @id @default(autoincrement())
+  palabrasClave  String
+  cabeceraId     Int?      @unique
+  cuerpo         String
+  footer         String?
+  predecesorId   Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime
+  ultimoMensaje  Boolean   @default(false)
+  Cabeceras      Cabecera? @relation(fields: [cabeceraId], references: [id])
+  Mensajes       Mensaje?  @relation("MensajesToMensajes_predecesorId", fields: [predecesorId], references: [id])
+  Clientes       Cliente?
+  other_Mensajes Mensaje[] @relation("MensajesToMensajes_predecesorId")
+
+  @@map("Mensajes")
+}
+
+enum TypoCabecera {
+  TEXT
+  MEDIA
+}

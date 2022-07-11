@@ -1,3 +1,4 @@
+import { PrismaClient } from "@prisma/client";
 import { Request, Response } from "express";
 import { metaApi } from "../api";
 import { Messages } from "../utils";
@@ -16,41 +17,101 @@ export const messagesController = async (req: Request, res: Response) => {
   try {
     const dataMessage = await Messages.getDataMessage(req.body);
 
-    if(dataMessage === 'delivered' || dataMessage === 'read' || dataMessage === 'sent'){
-      return res.status(200).send();
-    }
-
     if (!dataMessage) return res.status(200).json({ msg: 'No hay mensajes' });
 
-    const { phoneId, recipentWaId, text } = dataMessage;
+    if(dataMessage.status === 'read'){
+      // TODO: set the last message
+
+      // TODO: create a new message
+    }
+
+    if (dataMessage.status) {
+      return res.status(200).json({ msg: `Menssage ${dataMessage.status}` });
+    }
+
+    const { phoneId, from, text, messageId, name } = dataMessage;
+    if(!phoneId || !from || !text || !messageId || !name){
+      return res.status(200).json({ msg: 'No hay mensajes' });
+    }
+
+    // Mark as read the message
+    await metaApi.post(`/${phoneId}/messages`, {
+      "messaging_product": "whatsapp",
+      "status": "read",
+      "message_id": messageId,
+    });
+
+    // create prisma instance
+    const { cliente, mensaje } = new PrismaClient();
+
+    // verificar si el usuario existe
+    const client = await cliente.findUnique({
+      where: {
+        whatsapp: from,
+      }
+    });
+
+    // si no existe, crearlo
+    if (!client) {
+      await cliente.create({
+        data: {
+          whatsapp: from,
+          nombre: name,
+          updatedAt: new Date(),
+          ultimaConversacionId: null,
+          ultimoMensajeId: null,
+        }
+      });
+    }
+
+    let msg;
+
+    if(!client?.ultimoMensajeId){
+      msg = await mensaje.findUnique({
+        where: {
+          id: 1,
+        }
+      })
+    }else{
+      const msgs = await mensaje.findMany({
+        where: {
+          predecesorId: client?.ultimoMensajeId,
+        }
+      });
+      console.log(msgs);
+
+      msg = msgs.find(msg => msg.palabrasClave?.includes(text));
+    }
+
+    // actualizar el ultimo mensaje
+    await cliente.update({
+      where: {
+        whatsapp: from,
+      },
+      data: {
+        ultimoMensajeId: msg?.id,
+        updatedAt: new Date(),
+      }
+    });
+
+    const msgBot = msg?.cuerpo;
 
     let botMessageData;
 
     botMessageData = {
       "messaging_product": "whatsapp",
-      "to": `${recipentWaId}`,
+      "to": `${from}`,
       "type": "text",
-      "text": { body: '*Hola Mundo* 😄' },
-      // "template": {
-      //   "name": "hello_world",
-      //   "language": {
-      //     "code": "en_US"
-      //   }
-      // }
-    }
+      "text": {
+        body: msgBot,
+      },
+    };
 
-    // if( text?.toLocaleLowerCase().trim().includes('hola') ) {
-    //   dataToPost = {
-    //     "messaging_product": "whatsapp",
-    //     "to": `${recipentWaId}`,
-    //     "type": "text",
-    //     "text": { body: 'Hola 😃 que tal, Soy tu asistente virtual 🤖 \n\n ¿Qué deseas hacer? \n\n\n 1️⃣ Radicar una solicitud de soporte \n\n 2️⃣ Consultar el estado de una solicitud \n\n 3️⃣ Gestionar una solicitud radicada \n\n 4️⃣ Conocer Jira \n\n Elije el número de la opción para iniciar la consulta 👇' },
-    // }
-    
-    const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);
+    const { data } = await metaApi.post(`/${phoneId}/messages?miIdPersonalizado=myCustomId`, botMessageData);
+    console.log(data);
     return res.status(200).json(data);
   } catch (error) {
-    console.log(error);
+    // console.log(error);
     res.status(400).json({ msg: 'Error' });
   }
 }
