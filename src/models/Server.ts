@@ -14,7 +14,7 @@ class Server {
   }
 
   middlewares() {
-    // ? TODO: is required habilitar el cors
+    // TODO: habilar cors with a whitelist of origins see udemy react course
     // this.app.use(cors({
     //   origin: '*',
     // }));

@@ -7,7 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Cabecera {
+model Cabeceras {
   id           Int          @id @default(autoincrement())
   texto        String?
   imagen       String?
@@ -16,41 +16,66 @@ model Cabecera {
   typoCabecera TypoCabecera @default(TEXT)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime
-  Mensajes     Mensaje?
-
-  @@map("Cabeceras")
+  Mensajes     Mensajes?
 }
 
-model Cliente {
-  id                   Int      @id @default(autoincrement())
-  nombre               String
-  ultimaConversacionId Int?     @unique
-  ultimoMensajeId      Int?     @unique
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime
-  email                String?
-  whatsapp             String   @unique
-  Mensajes             Mensaje? @relation(fields: [ultimoMensajeId], references: [id])
-
-  @@map("Clientes")
+model Clientes {
+  id              Int             @id @default(autoincrement())
+  nombre          String
+  apellido        String
+  nombreEmpresa   String?
+  whatsapp        String          @unique
+  email           String?         @unique
+  num1            Int?
+  num2            Int?
+  text1           String?
+  text2           String?
+  date1           DateTime?
+  date2           DateTime?
+  conversacionId  Int?            @unique
+  ultimoMensajeId Int?            @unique
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime
+  Conversaciones  Conversaciones? @relation(fields: [conversacionId], references: [id])
+  Mensajes        Mensajes?       @relation(fields: [ultimoMensajeId], references: [id])
 }
 
-model Mensaje {
-  id             Int       @id @default(autoincrement())
+model Conversaciones {
+  id        Int        @id @default(autoincrement())
+  nombre    String
+  categoria String
+  active    Boolean?   @default(false)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime
+  Clientes  Clientes?
+  Mensajes  Mensajes[]
+}
+
+model Mensajes {
+  id             Int            @id @default(autoincrement())
+  conversacionId Int
   palabrasClave  String
-  cabeceraId     Int?      @unique
+  cabeceraId     Int?           @unique
   cuerpo         String
   footer         String?
   predecesorId   Int?
-  createdAt      DateTime  @default(now())
+  anyWord        Boolean        @default(false)
+  createdAt      DateTime       @default(now())
   updatedAt      DateTime
-  ultimoMensaje  Boolean   @default(false)
-  Cabeceras      Cabecera? @relation(fields: [cabeceraId], references: [id])
-  Mensajes       Mensaje?  @relation("MensajesToMensajes_predecesorId", fields: [predecesorId], references: [id])
-  Clientes       Cliente?
-  other_Mensajes Mensaje[] @relation("MensajesToMensajes_predecesorId")
+  Cabeceras      Cabeceras?     @relation(fields: [cabeceraId], references: [id])
+  Conversaciones Conversaciones @relation(fields: [conversacionId], references: [id])
+  Mensajes       Mensajes?      @relation("MensajesToMensajes_predecesorId", fields: [predecesorId], references: [id])
+  Clientes       Clientes?
+  other_Mensajes Mensajes[]     @relation("MensajesToMensajes_predecesorId")
+}
 
-  @@map("Mensajes")
+model MensajeLogs {
+  id         Int      @id @default(autoincrement())
+  mensajeId  String   @unique
+  status     String
+  recipentId String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
 }
 
 enum TypoCabecera {
