@@ -7,78 +7,210 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Cabeceras {
+model Conversacion {
+  id        Int       @id @default(autoincrement())
+  nombre    String
+  categoria String
+  active    Boolean?  @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  clientes  Cliente[]
+  mensajes  Mensaje[]
+
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+  usuarioId Int
+
+  @@map(name: "Conversaciones")
+}
+
+model Mensaje {
+  id             Int          @id @default(autoincrement())
+  conversacionId Int
+  palabrasClave  String
+  cabeceraId     Int?         @unique
+  cuerpo         String
+  footer         String?
+  predecesorId   Int?
+  anyWord        Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  successor      Mensaje[]    @relation("MessageSubMessage")
+  predecesor     Mensaje?     @relation("MessageSubMessage", fields: [predecesorId], references: [id])
+  header         Cabecera?    @relation(fields: [cabeceraId], references: [id])
+  cliente        Cliente[]
+  conversaciones Conversacion @relation(fields: [conversacionId], references: [id])
+
+  @@map("Mensajes")
+}
+
+model Cabecera {
   id           Int          @id @default(autoincrement())
   texto        String?
   imagen       String?
   documento    String?
   video        String?
-  typoCabecera TypoCabecera @default(TEXT)
+  tipoCabecera TipoCabecera @default(TEXT)
+  mediaType    MediaType?
   createdAt    DateTime     @default(now())
-  updatedAt    DateTime
-  Mensajes     Mensajes?
+  updatedAt    DateTime     @updatedAt
+  mensaje      Mensaje?
+
+  @@map("Cabeceras")
 }
 
-model Clientes {
-  id              Int             @id @default(autoincrement())
-  nombre          String
-  apellido        String
-  nombreEmpresa   String?
-  whatsapp        String          @unique
-  email           String?         @unique
-  num1            Int?
-  num2            Int?
-  text1           String?
-  text2           String?
-  date1           DateTime?
-  date2           DateTime?
-  conversacionId  Int?            @unique
-  ultimoMensajeId Int?            @unique
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime
-  Conversaciones  Conversaciones? @relation(fields: [conversacionId], references: [id])
-  Mensajes        Mensajes?       @relation(fields: [ultimoMensajeId], references: [id])
+model Usuario {
+  id       Int     @id @default(autoincrement())
+  nombre   String
+  apellido String
+  whatsapp String  @unique
+  email    String  @unique
+  password String
+  empresa  String?
+
+  role Role @default(USER)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clientes       Cliente[]
+  conversaciones Conversacion[]
+  RegistroCarga  RegistroCarga[]
+
+  app             App?              @relation(fields: [aplicationId], references: [id])
+  aplicationId    Int?              @unique
+  RegistroMensaje RegistroMensaje[]
+
+  @@map("Usuarios")
 }
 
-model Conversaciones {
-  id        Int        @id @default(autoincrement())
-  nombre    String
-  categoria String
-  active    Boolean?   @default(false)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime
-  Clientes  Clientes?
-  Mensajes  Mensajes[]
+model App {
+  id                Int     @id @default(autoincrement())
+  nombre            String
+  appId             String? @unique
+  token             String? @unique
+  businessAccountId String? @unique
+  phoneNumberId     String? @unique
+  webHookApi        String?
+  webHookToken      String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usuario Usuario?
+
+  @@map("Apps")
 }
 
-model Mensajes {
-  id             Int            @id @default(autoincrement())
-  conversacionId Int
-  palabrasClave  String
-  cabeceraId     Int?           @unique
-  cuerpo         String
-  footer         String?
-  predecesorId   Int?
-  anyWord        Boolean        @default(false)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime
-  Cabeceras      Cabeceras?     @relation(fields: [cabeceraId], references: [id])
-  Conversaciones Conversaciones @relation(fields: [conversacionId], references: [id])
-  Mensajes       Mensajes?      @relation("MensajesToMensajes_predecesorId", fields: [predecesorId], references: [id])
-  Clientes       Clientes?
-  other_Mensajes Mensajes[]     @relation("MensajesToMensajes_predecesorId")
+model Cliente {
+  id                     Int                      @id @default(autoincrement())
+  nombre                 String
+  apellido               String
+  nombreEmpresa          String?
+  whatsapp               String
+  codigo                 Int
+  email                  String?
+  categoria1             String?
+  categoria2             String?
+  num1                   Int?
+  num2                   Int?
+  text1                  String?
+  text2                  String?
+  date1                  DateTime?
+  date2                  DateTime?
+  usuarioId              Int
+  conversacionId         Int?
+  ultimoMensajeId        Int?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  usuario                Usuario                  @relation(fields: [usuarioId], references: [id])
+  botId                  Conversacion?            @relation(fields: [conversacionId], references: [id])
+  ultimoMensaje          Mensaje?                 @relation(fields: [ultimoMensajeId], references: [id])
+  registroCargas         RegistroCarga[]
+  RegistroMensajeCliente RegistroMensajeCliente[]
+
+  @@map("Clientes")
 }
 
-model MensajeLogs {
+model MensajeLog {
   id         Int      @id @default(autoincrement())
   mensajeId  String   @unique
   status     String
   recipentId String
   createdAt  DateTime @default(now())
-  updatedAt  DateTime
+  updatedAt  DateTime @updatedAt
+
+  @@map("MensajeLogs")
 }
 
-enum TypoCabecera {
+model RegistroCarga {
+  id             Int       @id @default(autoincrement())
+  descripcion    String?
+  archivoOrigen  String
+  totalRegistros Int
+  registrosOk    Int
+  registrosError Int
+  status         String
+  usuarioId      Int
+  cliente        Cliente[]
+  usuario        Usuario   @relation(fields: [usuarioId], references: [id])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("RegistrosCargas")
+}
+
+model RegistroMensaje {
+  id            Int     @id @default(autoincrement())
+  descripcion   String
+  templateUsed  String
+  status        Status  @default(ENVIADO)
+  scheduledDate String?
+  usuarioId     Int
+
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  RegistroMensajeCliente RegistroMensajeCliente[]
+  usuario                Usuario                  @relation(fields: [usuarioId], references: [id])
+
+  @@map("RegistrosMensajes")
+}
+
+model RegistroMensajeCliente {
+  id                Int      @id @default(autoincrement())
+  clienteId         Int?
+  registroMensajeId Int?
+  enviado           Boolean? @default(false)
+  entregado         Boolean? @default(false)
+  leido             Boolean? @default(false)
+  whatsappMessageId String?  @unique
+
+  cliente         Cliente?         @relation(fields: [clienteId], references: [id])
+  registroMensaje RegistroMensaje? @relation(fields: [registroMensajeId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TipoCabecera {
   TEXT
   MEDIA
 }
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum Status {
+  ENVIADO
+  ERROR
+  EN_COLA
+}
+
+// TODO: crear una tabla de categorias para las conversaciones

@@ -32,7 +32,7 @@ export const getDataMessage = (data: IWebHookText.IWebHookText & IWebHookStatus.
       return resolve(null);
     } catch (error) {
       console.log(error);
-      return reject(error);      
+      return reject(null);      
     }
   });
 }

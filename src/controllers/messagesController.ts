@@ -20,6 +20,41 @@ export const messagesController = async (req: Request, res: Response) => {
     if (!dataMessage) return res.status(200).json({ msg: 'No hay mensajes' });
 
     if (dataMessage.status) {
+      const { registroMensajeCliente } = prisma;
+      const registroMessage = await registroMensajeCliente.findUnique({
+        where: {
+          whatsappMessageId: dataMessage.messageId,
+        }
+      });
+      if(!registroMessage) return res.status(200).json({ msg: 'No hay mensajes' });
+      if(registroMessage.leido) return res.status(200).json({ msg: 'Mensaje ya leido' });
+      switch (dataMessage.status) {
+        case 'delivered':
+          await registroMensajeCliente.update({
+            where: {
+              whatsappMessageId: dataMessage.messageId,
+            },
+            data: {
+              entregado: true,
+            }
+          });
+          break;
+
+        case 'read':
+          await registroMensajeCliente.update({
+            where: {
+              whatsappMessageId: dataMessage.messageId,
+            },
+            data: {
+              leido: true,
+            }
+          });
+          break;
+      
+        default:
+          break;
+      }
+      
       return res.status(200).json({ msg: `Menssage ${dataMessage.status}` });
     }
 
@@ -29,17 +64,17 @@ export const messagesController = async (req: Request, res: Response) => {
     }
 
     // create prisma instance
-    const { clientes, conversaciones, mensajes, mensajeLogs } = prisma;
+    const { cliente, mensaje, mensajeLog } = prisma;
 
     // CONTROLAR QUE META NO ENVIE EL MISMO MENSAJE
-    const message = await mensajeLogs.findUnique({
+    const message = await mensajeLog.findUnique({
       where: {
         mensajeId: messageId
       },
     });
 
     if (message) return res.status(200).json({ msg: 'No Modificated' });
-    await mensajeLogs.create({
+    await mensajeLog.create({
       data: {
         mensajeId: messageId,
         recipentId: phoneId,
@@ -65,14 +100,14 @@ export const messagesController = async (req: Request, res: Response) => {
     };
 
     // verificar si el usuario existe
-    let cliente = await clientes.findUnique({
+    let client = await cliente.findFirst({
       where: {
         whatsapp: from,
       }
     });
 
     // si no existe, TODO: enviar un mensaje de no tener registro del usuario o crearlo y asignarle una conversacion publica
-    if (!cliente) {
+    if (!client) {
       // cliente = await clientes.create({
       //   data: {
       //     whatsapp: from,
@@ -92,7 +127,7 @@ export const messagesController = async (req: Request, res: Response) => {
     let msg;
 
     // TODO: verificar si el usuario tiene una conversacion asignada
-    if (!cliente.conversacionId) {
+    if (!client.conversacionId) {
       botMessageData.text.body = 'Perdon, no tengo una conversacion asignada para ti 😢';
       await metaApi.post(`/${phoneId}/messages`, botMessageData);
       return res.status(200).json({ msg: 'Message Sent' });
@@ -119,9 +154,9 @@ export const messagesController = async (req: Request, res: Response) => {
     // else {
 
     // Si no tiene un mensaje, buscar el mensaje principal
-    if (!cliente.ultimoMensajeId) {
-      msg = await mensajes.findFirst({
-        where: { conversacionId: cliente.conversacionId, predecesorId: null }
+    if (!client.ultimoMensajeId) {
+      msg = await mensaje.findFirst({
+        where: { conversacionId: client.conversacionId, predecesorId: null }
       });
       botMessageData.text.body = msg!.cuerpo;
 
@@ -138,8 +173,8 @@ export const messagesController = async (req: Request, res: Response) => {
       } 
     } else {
       // Encuentra todos los hijos del ultimo mensaje
-      const msgs = await mensajes.findMany({
-        where: { conversacionId: cliente.conversacionId, predecesorId: cliente.ultimoMensajeId }
+      const msgs = await mensaje.findMany({
+        where: { conversacionId: client.conversacionId, predecesorId: client.ultimoMensajeId }
       });
 
       // Encuentra el mensaje a enviar por la palabra clave
@@ -158,7 +193,7 @@ export const messagesController = async (req: Request, res: Response) => {
     }
 
     // Actualizar ultimo mensaje del cliente
-    await clientes.update({ where: { id: cliente.id }, data: { ultimoMensajeId: msg?.id } });
+    await cliente.update({ where: { id: client.id }, data: { ultimoMensajeId: msg?.id } });
 
     // const msgBot = msg?.cuerpo;
     botMessageData.text.body = msg?.cuerpo!;
