@@ -1,6 +1,6 @@
 import { Router } from 'express';
+import { MetaApi } from '../api';
 import { messages } from '../controllers';
-import { metaApi } from '../api';
 
 const router = Router();
 
@@ -9,21 +9,15 @@ router.get('/', (req, res) => {
 })
 
 // validar token con meta
-router.get( '/webhook', messages.validarWebHookToken);
+router.get( '/:webHookApi', messages.validarWebHookToken);
+
+router.post( '/sendMessage', messages.sendMessage);
 
 // controllar envios de mesnajes y responderlos
-router.post( '/webhook', messages.messagesController );
+router.post( '/:webHookApi', messages.messagesController );
 
 router.post( '/send', async (req, res) => {
   try {
-    // const botMessageData = {
-    //   "messaging_product": "whatsapp",
-    //   "to": `${593968806155}`,
-    //   "type": "text",
-    //   "text": {
-    //     body: 'Disculpas, no te tengo registrado en mi base de datos 😢',
-    //   },
-    // };
     const botMessageData = {
       "messaging_product": "whatsapp",
       "to": `${593968806155}`,
@@ -33,7 +27,8 @@ router.post( '/send', async (req, res) => {
         "language": { "code": "en_US" }
       },
     };
-  
+    // TODO: GET APP TOKEN FROM DATABASE
+    const metaApi = MetaApi.createApi('s');
     const { data } = await metaApi.post(`/${104148912327082}/messages`, botMessageData);
     console.log(data);
 

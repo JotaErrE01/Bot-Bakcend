@@ -1,1 +1,1 @@
-export * from './metaApi';
+export * as MetaApi from './metaApi';

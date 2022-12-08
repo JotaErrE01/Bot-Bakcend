@@ -14,119 +14,102 @@ model Conversacion {
   active    Boolean?  @default(false)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  empresaId String
   clientes  Cliente[]
+  Empresas  Empresas  @relation("ConversacionesToEmpresas", fields: [empresaId], references: [id])
   mensajes  Mensaje[]
 
-  usuario   Usuario @relation(fields: [usuarioId], references: [id])
-  usuarioId Int
-
-  @@map(name: "Conversaciones")
+  @@map("Conversaciones")
 }
 
 model Mensaje {
   id             Int          @id @default(autoincrement())
   conversacionId Int
-  palabrasClave  String
-  cabeceraId     Int?         @unique
-  cuerpo         String
-  footer         String?
-  predecesorId   Int?
   anyWord        Boolean      @default(false)
+  palabrasClave  String
+  cuerpo         String?      @db.VarChar(1000)
+  mediaType      MediaType?
+  link           String?
+  predecesorId   Int?
+  altMessage     String?      @db.VarChar(1000)
+  mensajeAsesor  Boolean?     @default(false)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
-  successor      Mensaje[]    @relation("MessageSubMessage")
-  predecesor     Mensaje?     @relation("MessageSubMessage", fields: [predecesorId], references: [id])
-  header         Cabecera?    @relation(fields: [cabeceraId], references: [id])
   cliente        Cliente[]
   conversaciones Conversacion @relation(fields: [conversacionId], references: [id])
+  predecesor     Mensaje?     @relation("MessageSubMessage", fields: [predecesorId], references: [id])
+  successor      Mensaje[]    @relation("MessageSubMessage")
 
   @@map("Mensajes")
 }
 
-model Cabecera {
-  id           Int          @id @default(autoincrement())
-  texto        String?
-  imagen       String?
-  documento    String?
-  video        String?
-  tipoCabecera TipoCabecera @default(TEXT)
-  mediaType    MediaType?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  mensaje      Mensaje?
-
-  @@map("Cabeceras")
-}
-
 model Usuario {
-  id       Int     @id @default(autoincrement())
-  nombre   String
-  apellido String
-  whatsapp String  @unique
-  email    String  @unique
-  password String
-  empresa  String?
-
-  role Role @default(USER)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  clientes       Cliente[]
-  conversaciones Conversacion[]
-  RegistroCarga  RegistroCarga[]
-
-  app             App?              @relation(fields: [aplicationId], references: [id])
-  aplicationId    Int?              @unique
-  RegistroMensaje RegistroMensaje[]
+  id            Int           @id @default(autoincrement())
+  nombre        String        @db.VarChar(100)
+  apellido      String        @db.VarChar(100)
+  whatsapp      String        @unique
+  email         String        @unique
+  password      String
+  avatar        String?       @db.VarChar(100)
+  roleId        Int?
+  roleDefaultId String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  empresaId     String
+  status        Boolean?      @default(true)
+  ChatHistory   ChatHistory[]
+  Empresas      Empresas      @relation("EmpresasToUsuarios", fields: [empresaId], references: [id])
+  RolesDefault  RolesDefault? @relation("RolesDefaultToUsuarios", fields: [roleDefaultId], references: [id])
+  Roles         Roles?        @relation("RolesToUsuarios", fields: [roleId], references: [id])
 
   @@map("Usuarios")
 }
 
 model App {
-  id                Int     @id @default(autoincrement())
-  nombre            String
-  appId             String? @unique
-  token             String? @unique
-  businessAccountId String? @unique
-  phoneNumberId     String? @unique
-  webHookApi        String?
-  webHookToken      String? @unique
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  usuario Usuario?
+  id                Int      @id @default(autoincrement())
+  nombre            String   @db.VarChar(50)
+  appId             String?  @unique
+  token             String?  @unique
+  businessAccountId String?  @unique
+  phoneNumberId     String?  @unique
+  webHookApi        String?  @unique
+  webHookToken      String?  @unique
+  secretKey         String?  @unique
+  empresaId         String   @unique
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  Empresas          Empresas @relation("AppsToEmpresas", fields: [empresaId], references: [id])
 
   @@map("Apps")
 }
 
 model Cliente {
-  id                     Int                      @id @default(autoincrement())
-  nombre                 String
-  apellido               String
-  nombreEmpresa          String?
-  whatsapp               String
-  codigo                 Int
-  email                  String?
-  categoria1             String?
-  categoria2             String?
-  num1                   Int?
-  num2                   Int?
-  text1                  String?
-  text2                  String?
-  date1                  DateTime?
-  date2                  DateTime?
-  usuarioId              Int
-  conversacionId         Int?
-  ultimoMensajeId        Int?
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @updatedAt
-  usuario                Usuario                  @relation(fields: [usuarioId], references: [id])
-  botId                  Conversacion?            @relation(fields: [conversacionId], references: [id])
-  ultimoMensaje          Mensaje?                 @relation(fields: [ultimoMensajeId], references: [id])
-  registroCargas         RegistroCarga[]
-  RegistroMensajeCliente RegistroMensajeCliente[]
+  id              Int           @id @default(autoincrement())
+  nombre          String        @db.VarChar(100)
+  apellido        String        @db.VarChar(100)
+  nombreEmpresa   String?       @db.VarChar(100)
+  whatsapp        String
+  codigo          Int
+  email           String?       @db.VarChar(100)
+  categoria1      String?
+  categoria2      String?
+  num1            Int?
+  num2            Int?
+  text1           String?
+  text2           String?
+  date1           DateTime?
+  date2           DateTime?
+  conversacionId  Int?
+  ultimoMensajeId Int?
+  isChating       Boolean?      @default(false)
+  chatAsesorId    Int?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  empresaId       String
+  ChatHistory     ChatHistory[]
+  botId           Conversacion? @relation(fields: [conversacionId], references: [id])
+  Empresas        Empresas      @relation("ClientesToEmpresas", fields: [empresaId], references: [id])
+  ultimoMensaje   Mensaje?      @relation(fields: [ultimoMensajeId], references: [id])
 
   @@map("Clientes")
 }
@@ -143,57 +126,129 @@ model MensajeLog {
 }
 
 model RegistroCarga {
-  id             Int       @id @default(autoincrement())
+  id             Int              @id @default(autoincrement())
   descripcion    String?
   archivoOrigen  String
   totalRegistros Int
   registrosOk    Int
   registrosError Int
   status         String
-  usuarioId      Int
-  cliente        Cliente[]
-  usuario        Usuario   @relation(fields: [usuarioId], references: [id])
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  empresaId      String
+  DetallesCargas DetallesCargas[] @relation("DetallesCargasToRegistrosCargas")
+  Empresas       Empresas         @relation("EmpresasToRegistrosCargas", fields: [empresaId], references: [id])
 
   @@map("RegistrosCargas")
 }
 
 model RegistroMensaje {
-  id            Int     @id @default(autoincrement())
-  descripcion   String
-  templateUsed  String
-  status        Status  @default(ENVIADO)
-  scheduledDate String?
-  usuarioId     Int
-
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @updatedAt
-  RegistroMensajeCliente RegistroMensajeCliente[]
-  usuario                Usuario                  @relation(fields: [usuarioId], references: [id])
+  id              Int               @id @default(autoincrement())
+  descripcion     String
+  templateUsed    String
+  status          Status            @default(ENVIADO)
+  scheduledDate   String?
+  templateId      String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  empresaId       String
+  CampaignDetails CampaignDetails[] @relation("CampaignDetailsToRegistrosMensajes")
+  Empresas        Empresas          @relation("EmpresasToRegistrosMensajes", fields: [empresaId], references: [id])
 
   @@map("RegistrosMensajes")
 }
 
-model RegistroMensajeCliente {
-  id                Int      @id @default(autoincrement())
-  clienteId         Int?
-  registroMensajeId Int?
-  enviado           Boolean? @default(false)
-  entregado         Boolean? @default(false)
-  leido             Boolean? @default(false)
-  whatsappMessageId String?  @unique
-
-  cliente         Cliente?         @relation(fields: [clienteId], references: [id])
-  registroMensaje RegistroMensaje? @relation(fields: [registroMensajeId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model DetallesCargas {
+  id              Int           @id @default(autoincrement())
+  registroCargaId Int
+  nombresCliente  String
+  whatsappCliente String
+  emailCliente    String?
+  causeError      String?
+  status          String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime
+  RegistrosCargas RegistroCarga @relation("DetallesCargasToRegistrosCargas", fields: [registroCargaId], references: [id])
 }
 
-enum TipoCabecera {
-  TEXT
-  MEDIA
+model CampaignDetails {
+  id                Int             @id @default(autoincrement())
+  clienteId         Int?
+  nombre            String
+  apellido          String
+  whatsapp          String
+  email             String?
+  registroMensajeId Int
+  enviado           Boolean?        @default(false)
+  entregado         Boolean?        @default(false)
+  leido             Boolean?        @default(false)
+  whatsappMessageId String?         @unique
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime
+  RegistroMensaje   RegistroMensaje @relation("CampaignDetailsToRegistrosMensajes", fields: [registroMensajeId], references: [id])
+}
+
+model Acciones {
+  id           Int            @id @default(autoincrement())
+  nombre       Actions        @unique
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
+  Roles        Roles[]        @relation("AccionToRol")
+  RolesDefault RolesDefault[] @relation("AccionToRolDefault")
+}
+
+model Empresas {
+  id              String            @id
+  ruc             String            @unique @db.VarChar(50)
+  whatsapp        String            @unique @db.VarChar(15)
+  nombre          String            @db.VarChar(100)
+  logo            String?           @db.VarChar(100)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  App             App?              @relation("AppsToEmpresas")
+  ChatHistory     ChatHistory[]
+  Cliente         Cliente[]         @relation("ClientesToEmpresas")
+  Conversacion    Conversacion[]    @relation("ConversacionesToEmpresas")
+  RegistroCarga   RegistroCarga[]   @relation("EmpresasToRegistrosCargas")
+  RegistroMensaje RegistroMensaje[] @relation("EmpresasToRegistrosMensajes")
+  Roles           Roles[]
+  Usuario         Usuario[]         @relation("EmpresasToUsuarios")
+}
+
+model Roles {
+  id        Int        @id @default(autoincrement())
+  nombre    String     @db.VarChar(50)
+  empresaId String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime
+  Empresas  Empresas   @relation(fields: [empresaId], references: [id])
+  Usuario   Usuario[]  @relation("RolesToUsuarios")
+  Acciones  Acciones[] @relation("AccionToRol")
+}
+
+model RolesDefault {
+  id        String       @id
+  nombre    DefaultRoles @unique
+  createdAt DateTime     @default(now())
+  updatedAt DateTime
+  Usuario   Usuario[]    @relation("RolesDefaultToUsuarios")
+  Acciones  Acciones[]   @relation("AccionToRolDefault")
+}
+
+model ChatHistory {
+  id        Int        @id @default(autoincrement())
+  clienteId Int
+  asesorId  Int?
+  mensaje   String?
+  media     String?
+  mediaType MediaType?
+  isClient  Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime
+  empresaId String
+  Usuario   Usuario?   @relation(fields: [asesorId], references: [id])
+  Cliente   Cliente    @relation(fields: [clienteId], references: [id])
+  Empresas  Empresas   @relation(fields: [empresaId], references: [id])
 }
 
 enum MediaType {
@@ -202,15 +257,47 @@ enum MediaType {
   DOCUMENT
 }
 
-enum Role {
-  ADMIN
-  USER
-}
-
 enum Status {
   ENVIADO
   ERROR
   EN_COLA
 }
 
-// TODO: crear una tabla de categorias para las conversaciones
+enum Actions {
+  CREAR_APP
+  EDITAR_APP
+  ELIMINAR_APP
+  VER_APP
+  CREAR_PLANTILLA
+  EDITAR_PLANTILLA
+  ELIMINAR_PLANTILLA
+  VER_PLANTILLA
+  CREAR_BOT
+  EDITAR_BOT
+  ELIMINAR_BOT
+  VER_BOT
+  CREAR_EMPRESA
+  EDITAR_EMPRESA
+  ELIMINAR_EMPRESA
+  VER_EMPRESA
+  CREAR_USUARIO
+  EDITAR_USUARIO
+  ELIMINAR_USUARIO
+  VER_USUARIO
+  CREAR_CLIENTE
+  EDITAR_CLIENTE
+  ELIMINAR_CLIENTE
+  VER_CLIENTE
+  CREAR_ROL
+  EDITAR_ROL
+  ELIMINAR_ROL
+  VER_ROL
+  CREAR_CAMPAIGNS
+  VER_LOGS
+}
+
+enum DefaultRoles {
+  ADMIN
+  OPERADOR
+  CREADOR_PLANTILLAS
+}

@@ -7,4 +7,4 @@ dotenv.config();
 // Instanciar el servidor
 const server = new Server();
 
-server.listen();
+server.execute();

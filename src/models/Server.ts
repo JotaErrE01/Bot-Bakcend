@@ -1,16 +1,31 @@
+import http from 'http';
+import { Server as SocketServer } from 'socket.io';
 import express, { Application } from 'express';
-// import cors from 'cors';
 import { webHookRouter } from '../routes';
+import { Sockets } from './Socket';
 
 class Server {
   private app: Application;
-  private port: string;
+  private port: number;
+  private server: http.Server;
+  private io: SocketServer;
 
   constructor() {
     this.app = express();
-    this.port = process.env.PORT || '3000';
-    this.middlewares();
-    this.routes();
+    this.port = parseInt(process.env.PORT || '80');
+
+    // http server
+    this.server = http.createServer(this.app);
+
+    // Configuraciones de sockets
+    this.io = new SocketServer(this.server, {
+      cors: {
+        origin: '*',
+      }
+    });
+
+    // this.middlewares();
+    // this.routes();
   }
 
   middlewares() {
@@ -24,15 +39,44 @@ class Server {
   }
 
   routes() {
-    this.app.use('/', webHookRouter);
+    // this.app.put('/api/socket', (req, res) => {
+    //   // emitir un evento
+    //   // this.io.send('hola', req.body.message);
+    //   this.io.emit('message', 'hola 2');
+
+    //   return res.status(200).json({
+    //     ok: true,
+    //     message: 'Todo está bien',
+    //   });
+    // });
+
+    this.app.use('/api', (req, res, next) => {
+      Object.assign(req, { io: this.io });
+      webHookRouter(req, res, next);
+    });
   }
 
-  listen() {
-    this.app.listen(this.port, () => {
+  // Esta configuración se puede tener aquí o como propieda de clase
+  // depende mucho de lo que necesites
+  configurarSockets() {
+    console.log('Configurando sockets');
+    new Sockets(this.io);
+  }
+
+  execute() {
+    // Inicializar Middlewares
+    this.middlewares();
+
+    this.routes(); // rutas de mi aplicación
+
+    // Inicializar sockets
+    this.configurarSockets();
+
+    // Inicializar Server
+    this.server.listen(this.port, () => {
       console.log(`🚀 Server running on port ${this.port} 🚀`);
-    })
+    });
   }
-
 }
 
 export default Server;
