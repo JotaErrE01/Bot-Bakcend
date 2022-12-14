@@ -13,8 +13,8 @@ export class Sockets {
     this.io.on('connection', (socket) => {
       const uid = socket.handshake.query['uid'];
       const empresaId = socket.handshake.query['empresaId'];
-      console.log({uid: socket.handshake.query['uid']});
-      console.log({empresaId: socket.handshake.query['empresaId']});
+      // console.log({uid: socket.handshake.query['uid']});
+      // console.log({empresaId: socket.handshake.query['empresaId']});
       // console.log('client conected');
       // don't delete this if you want to use the socket in the routes and send events onlly to the client that made the request
       // socket.broadcast.emit('message', false);

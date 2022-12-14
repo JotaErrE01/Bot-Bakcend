@@ -4,7 +4,7 @@ import { DefaultEventsMap } from "socket.io/dist/typed-events";
 import { App, Mensaje } from "@prisma/client";
 import { prisma } from "../db";
 import { MetaApi } from "../api";
-import { formatVariables, Messages } from "../utils";
+import { formatVariables, Messages, getReqType, Templates } from "../utils";
 
 // funcion para validar el token con meta
 export const validarWebHookToken = async (req: Request, res: Response) => {
@@ -29,11 +29,10 @@ export const validarWebHookToken = async (req: Request, res: Response) => {
 // funcion para controlar los mensajes de whatsapp
 export const messagesController = async (req: Request, res: Response) => {
   try {
+    const io: SocketServer<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any> = (req as any).io;
     const { webHookApi } = req.params;
     const { app, campaignDetails } = prisma;
-    const dataMessage = await Messages.getDataMessage(req.body);
 
-    if (!dataMessage) return res.status(200).json({ msg: 'No hay mensajes' });
     if (!webHookApi) return res.status(200).json({ msg: 'WebHookApi no encontrado' });
 
     const aplication = await app.findUnique({
@@ -43,6 +42,16 @@ export const messagesController = async (req: Request, res: Response) => {
     });
 
     if (!aplication) return res.status(200).json({ msg: 'Bad Request' });
+
+    const reqType = getReqType(req.body);
+    if (reqType === 'template') {
+      const templateStatus = Templates.getTemplateStatus(req.body);
+      io.to(aplication.empresaId.toString()).emit('template-status', templateStatus);
+      return res.status(200).json({ msg: 'Template Status Send' });
+    }
+
+    const dataMessage = await Messages.getDataMessage(req.body);
+    if (!dataMessage) return res.status(200).json({ msg: 'No hay mensajes' });
 
     if (dataMessage.status) {
       const registroMessage = await campaignDetails.findUnique({
@@ -156,14 +165,12 @@ export const messagesController = async (req: Request, res: Response) => {
     // console.log({client});
 
 
-    // TODO: verificar si el usuario tiene una conversacion asignada
     if (!client.conversacionId) {
       botMessageData.text.body = 'Perdon, no tengo una conversacion asignada para ti 😢';
       await metaApi.post(`/${phoneId}/messages`, botMessageData);
       return res.status(200).json({ msg: 'Message Sent' });
     }
 
-    // TODO: VERIFICAR SI EL CLIENTE TIENE UNA CONVERSACION CON UN ASESOR
     if (client.ultimoMensajeId || client.isChating) {
       console.log('🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖');
 
@@ -190,8 +197,6 @@ export const messagesController = async (req: Request, res: Response) => {
             }
           });
         }
-
-        const io: SocketServer<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any> = (req as any).io;
 
         if (client.chatAsesorId) {
           const chat = {

@@ -1,4 +1,4 @@
-import { IWebHookText, IWebHookButton, IWebHookStatus } from "../../interfaces";
+import { IWebHookText, IWebHookStatus } from "../../interfaces";
 
 export interface IGetDataMessage {
   phoneId: string;
