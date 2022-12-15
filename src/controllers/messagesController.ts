@@ -2,9 +2,9 @@ import { Request, Response } from "express";
 import { Server as SocketServer } from 'socket.io';
 import { DefaultEventsMap } from "socket.io/dist/typed-events";
 import { App, Mensaje } from "@prisma/client";
-import { prisma } from "../db";
-import { MetaApi } from "../api";
 import { formatVariables, Messages, getReqType, Templates } from "../utils";
+import { MetaApi } from "../api";
+import { prisma } from "../db";
 
 // funcion para validar el token con meta
 export const validarWebHookToken = async (req: Request, res: Response) => {
@@ -241,6 +241,10 @@ export const messagesController = async (req: Request, res: Response) => {
       if (!msg?.anyWord) {
         const palabrasClave = msg!.palabrasClave.split(',');
         const palabraClave = palabrasClave.find(palabra => palabra.toLowerCase() === text.toLowerCase());
+        console.log('===================================');
+        // console.log({ palabraClave, palabrasClave, text })
+        // console.log('===================================');
+
         // si anyword es falso y no hay palabras clave, enviar un mensaje de no entendi
         if (!palabraClave) {
           botMessageData.text.body = msg?.altMessage || 'Perdon, no entiendo tu mensaje 😢';
@@ -258,6 +262,7 @@ export const messagesController = async (req: Request, res: Response) => {
       // Encuentra el mensaje a enviar por la palabra clave
       msg = msgs.find(({ palabrasClave }) => {
         const palabrasClaveArray = palabrasClave.split(',');
+        // console.log({ palabrasClaveArray})
         return palabrasClaveArray.find(palabra => text.toLowerCase().includes(palabra.toLowerCase()));
       });
 
@@ -266,7 +271,6 @@ export const messagesController = async (req: Request, res: Response) => {
         const mensajeNoEntendi = await mensaje.findUnique({
           where: { id: client.ultimoMensajeId }
         });
-
         // manejando las variables en el mensaje alternativo
         botMessageData.text.body = formatVariables(mensajeNoEntendi?.altMessage, client) || 'Perdon, no entiendo tu mensaje 😢';
 
