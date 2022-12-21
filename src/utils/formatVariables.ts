@@ -14,6 +14,9 @@ export const formatVariables = (msg: string | null | undefined, client: Cliente)
       if (key === 'fecha1') key = 'date1';
       if (key === 'fecha2') key = 'date2';
       if(client[(key as keyof Cliente)]) replacer = <string>client[(key as keyof Cliente)!];
+
+      if(key === 'nombre') replacer = `${client.nombre} ${client.apellido}`;
+
       altMessage = altMessage.replaceAll(variable, `${replacer}`);
     }
   });
