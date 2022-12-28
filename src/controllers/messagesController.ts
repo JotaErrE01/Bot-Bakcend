@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { Server as SocketServer } from 'socket.io';
 import { DefaultEventsMap } from "socket.io/dist/typed-events";
 import { App, Mensaje } from "@prisma/client";
-import { formatVariables, Messages, getReqType, Templates } from "../utils";
+import { formatVariables, Messages, getReqType, Templates, sendMedia, validCodes } from "../utils";
 import { MetaApi } from "../api";
 import { prisma } from "../db";
 
@@ -162,9 +162,6 @@ export const messagesController = async (req: Request, res: Response) => {
 
     let msg;
 
-    // console.log({client});
-
-
     if (!client.conversacionId) {
       botMessageData.text.body = 'Perdon, no tengo una conversacion asignada para ti 😢';
       await metaApi.post(`/${phoneId}/messages`, botMessageData);
@@ -231,6 +228,10 @@ export const messagesController = async (req: Request, res: Response) => {
         return res.status(200).json({ msg: 'Mensaje enviado' });
       }
     }
+    
+    const result = await validCodes(client, text, botMessageData, metaApi, phoneId, !client.ultimoMensajeId);
+    if(result) return res.status(200).json({ msg: 'Mensaje enviado' });
+
 
     // Si no tiene un mensaje, buscar el mensaje principal
     if (!client.ultimoMensajeId) {
@@ -241,9 +242,6 @@ export const messagesController = async (req: Request, res: Response) => {
       if (!msg?.anyWord) {
         const palabrasClave = msg!.palabrasClave.split(',');
         const palabraClave = palabrasClave.find(palabra => palabra.toLowerCase() === text.toLowerCase());
-        console.log('===================================');
-        // console.log({ palabraClave, palabrasClave, text })
-        // console.log('===================================');
 
         // si anyword es falso y no hay palabras clave, enviar un mensaje de no entendi
         if (!palabraClave) {
@@ -251,7 +249,6 @@ export const messagesController = async (req: Request, res: Response) => {
           await metaApi.post(`/${phoneId}/messages`, botMessageData);
           return res.status(200).json({ msg: 'Message Sent' });
         }
-        // await metaApi.post(`/${phoneId}/messages`, botMessageData);
       }
     } else {
       // Encuentra todos los hijos del ultimo mensaje
@@ -262,8 +259,7 @@ export const messagesController = async (req: Request, res: Response) => {
       // Encuentra el mensaje a enviar por la palabra clave
       msg = msgs.find(({ palabrasClave }) => {
         const palabrasClaveArray = palabrasClave.split(',');
-        // console.log({ palabrasClaveArray})
-        return palabrasClaveArray.find(palabra => text.toLowerCase().includes(palabra.toLowerCase()));
+        return palabrasClaveArray.find(palabra => text.toLowerCase() === palabra.toLowerCase());
       });
 
       // Si no encuentra el mensaje, enviar un mensaje de no entendi
@@ -292,35 +288,18 @@ export const messagesController = async (req: Request, res: Response) => {
     };
 
     // enviar media si existe en el mensaje
-    if (msg?.mediaType === 'IMAGE') {
-      mediaObj.type = 'image';
-      Object.assign(mediaObj, { image: { link: msg.link } });
-      // mediaObj.image.link = (msg.link as string);
-
-      await metaApi.post(`/${phoneId}/messages`, mediaObj);
-      if (!msg?.cuerpo) return res.status(200).json({ msg: 'Message Sent' });
-    }
-
-    if (msg?.mediaType === 'DOCUMENT') {
-      mediaObj.type = 'document';
-      Object.assign(mediaObj, { document: { link: msg.link } });
-      // mediaObj.document.link = (msg.link as string);
-
-      await metaApi.post(`/${phoneId}/messages`, mediaObj);
-      if (!msg?.cuerpo) return res.status(200).json({ msg: 'Message Sent' });
-    }
-
-    if (msg?.mediaType === 'VIDEO') {
-      mediaObj.type = 'video';
-      Object.assign(mediaObj, { video: { link: msg.link } });
-
-      await metaApi.post(`/${phoneId}/messages`, mediaObj);
-      if (!msg?.cuerpo) return res.status(200).json({ msg: 'Message Sent' });
-    }
+    const mediaSent = await sendMedia(msg, mediaObj, phoneId, metaApi);
+    if (!mediaSent) return res.status(200).json({ msg: 'Message Sent' });
+    if (!msg?.cuerpo) return res.status(200).json({ msg: 'Message Sent' });
 
     botMessageData.text.body = formatVariables((msg!.cuerpo as string), client)!;
-
+    // console.log('====================================');
+    // console.log({botMessageData});
+    // console.log('====================================');
     const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);
+
+
+    console.table(data)
 
     return res.status(200).json(data);
   } catch (error) {

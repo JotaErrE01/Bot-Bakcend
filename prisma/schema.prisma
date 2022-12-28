@@ -11,7 +11,7 @@ model Conversacion {
   id        Int       @id @default(autoincrement())
   nombre    String
   categoria String
-  active    Boolean?  @default(false)
+  active    Boolean?  @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   empresaId String
@@ -23,22 +23,25 @@ model Conversacion {
 }
 
 model Mensaje {
-  id             Int          @id @default(autoincrement())
-  conversacionId Int
-  anyWord        Boolean      @default(false)
-  palabrasClave  String
-  cuerpo         String?      @db.VarChar(1000)
-  mediaType      MediaType?
-  link           String?
-  predecesorId   Int?
-  altMessage     String?      @db.VarChar(1000)
-  mensajeAsesor  Boolean?     @default(false)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  cliente        Cliente[]
-  conversaciones Conversacion @relation(fields: [conversacionId], references: [id])
-  predecesor     Mensaje?     @relation("MessageSubMessage", fields: [predecesorId], references: [id])
-  successor      Mensaje[]    @relation("MessageSubMessage")
+  id                    Int          @id @default(autoincrement())
+  conversacionId        Int
+  anyWord               Boolean      @default(false)
+  palabrasClave         String
+  cuerpo                String?      @db.VarChar(1000)
+  mediaType             MediaType?
+  link                  String?
+  predecesorId          Int?
+  altMessage            String?      @db.VarChar(1000)
+  mensajeAsesor         Boolean?     @default(false)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  backToLastMessageCode String?      @db.VarChar(20)
+  backToMainCode        String?      @db.VarChar(20)
+  repeatMessageCode     String?      @db.VarChar(20)
+  cliente               Cliente[]
+  conversaciones        Conversacion @relation(fields: [conversacionId], references: [id])
+  predecesor            Mensaje?     @relation("MessageSubMessage", fields: [predecesorId], references: [id])
+  successor             Mensaje[]    @relation("MessageSubMessage")
 
   @@map("Mensajes")
 }
