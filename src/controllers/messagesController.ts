@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { Server as SocketServer } from 'socket.io';
 import { DefaultEventsMap } from "socket.io/dist/typed-events";
-import { App, Mensaje } from "@prisma/client";
+import { App, Mensaje, Cliente } from '@prisma/client';
 import { formatVariables, Messages, getReqType, Templates, sendMedia, validCodes } from "../utils";
 import { MetaApi } from "../api";
 import { prisma } from "../db";
@@ -118,47 +118,25 @@ export const messagesController = async (req: Request, res: Response) => {
 
     const metaApi = MetaApi.createApi(aplication.token!);
 
-    // Mark as read the message
-    // await metaApi.post(`/${phoneId}/messages`, {
-    //   "messaging_product": "whatsapp",
-    //   "status": "read",
-    //   "message_id": messageId,
-    // });
-
     const botMessageData = {
       "messaging_product": "whatsapp",
       "to": `${from}`,
       "type": "text",
       "text": {
-        body: 'Disculpas, no te tengo registrado en mi base de datos 😢',
+        body: 'Hola!, No te tenemos registrado en nuestra base de datos, pero con gusto te atenderemos.',
       },
     };
-
+    
     // verificar si el cliente existe
-    let client = await cliente.findFirst({
-      where: {
-        whatsapp: from,
-        empresaId: aplication.empresaId,
-      }
-    });
+    let clientResult: Cliente[] | null = await prisma.$queryRaw`SELECT * FROM "Clientes" WHERE "empresaId" = ${aplication.empresaId} AND concat("codigo", "whatsapp") = ${from} LIMIT 1`;
 
-    // si no existe, TODO: enviar un mensaje de no tener registro del usuario o crearlo y asignarle una conversacion publica
-    if (!client) {
-      // cliente = await clientes.create({
-      //   data: {
-      //     whatsapp: from,
-      //     nombre: name,
-      //     apellido: '',
-      //     updatedAt: new Date(),
-      //     conversacionId: null,
-      //     ultimoMensajeId: null,
-      //   }
-      // });
-
-      // mensaje de no registrado en la base
+    // no existe el cliente TODO: REGISTRARLO
+    if(clientResult?.length !== 1){
       await metaApi.post(`/${phoneId}/messages`, botMessageData);
       return res.status(200).json({ msg: 'Mensaje enviado' });
     }
+
+    let client = clientResult[0];
 
     let msg;
 
@@ -228,10 +206,11 @@ export const messagesController = async (req: Request, res: Response) => {
         return res.status(200).json({ msg: 'Mensaje enviado' });
       }
     }
-    
-    const result = await validCodes(client, text, botMessageData, metaApi, phoneId, !client.ultimoMensajeId);
-    if(result) return res.status(200).json({ msg: 'Mensaje enviado' });
 
+    if(client.ultimoMensajeId){
+      const result = await validCodes(client, text, botMessageData, metaApi, phoneId, !client.ultimoMensajeId);
+      if(result) return res.status(200).json({ msg: 'Mensaje enviado' });
+    } 
 
     // Si no tiene un mensaje, buscar el mensaje principal
     if (!client.ultimoMensajeId) {
@@ -293,13 +272,8 @@ export const messagesController = async (req: Request, res: Response) => {
     if (!msg?.cuerpo) return res.status(200).json({ msg: 'Message Sent' });
 
     botMessageData.text.body = formatVariables((msg!.cuerpo as string), client)!;
-    // console.log('====================================');
-    // console.log({botMessageData});
-    // console.log('====================================');
+
     const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);
-
-
-    console.table(data)
 
     return res.status(200).json(data);
   } catch (error) {

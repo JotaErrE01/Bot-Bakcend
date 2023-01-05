@@ -14,8 +14,14 @@ export const formatVariables = (msg: string | null | undefined, client: Cliente)
       if (key === 'fecha1') key = 'date1';
       if (key === 'fecha2') key = 'date2';
       if(client[(key as keyof Cliente)]) replacer = <string>client[(key as keyof Cliente)!];
-
       if(key === 'nombre') replacer = `${client.nombre} ${client.apellido}`;
+
+      // Format date
+      if(key.includes('date')) {
+        replacer = new Date(replacer)
+          .toLocaleDateString('es-AR', { dateStyle: 'medium' })
+          .replaceAll(' ', '-');
+      };
 
       altMessage = altMessage.replaceAll(variable, `${replacer}`);
     }
