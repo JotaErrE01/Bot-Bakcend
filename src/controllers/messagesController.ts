@@ -5,6 +5,7 @@ import { App, Mensaje, Cliente } from '@prisma/client';
 import { formatVariables, Messages, getReqType, Templates, sendMedia, validCodes } from "../utils";
 import { MetaApi } from "../api";
 import { prisma } from "../db";
+import axios from 'axios';
 
 // funcion para validar el token con meta
 export const validarWebHookToken = async (req: Request, res: Response) => {
@@ -27,7 +28,7 @@ export const validarWebHookToken = async (req: Request, res: Response) => {
 }
 
 // funcion para controlar los mensajes de whatsapp
-export const messagesController = async (req: Request, res: Response) => {
+export const messagesController = async (req: Request, res: Response) => {  
   try {
     const io: SocketServer<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any> = (req as any).io;
     const { webHookApi } = req.params;
@@ -128,7 +129,11 @@ export const messagesController = async (req: Request, res: Response) => {
     };
     
     // verificar si el cliente existe
-    let clientResult: Cliente[] | null = await prisma.$queryRaw`SELECT * FROM "Clientes" WHERE "empresaId" = ${aplication.empresaId} AND concat("codigo", "whatsapp") = ${from} LIMIT 1`;
+    // let clientResult: Cliente[] | null = await prisma.$queryRaw`SELECT * FROM "Clientes" WHERE "empresaId" = ${aplication.empresaId} AND concat("codigo", "whatsapp") = ${from} LIMIT 1`;
+
+    let clientResult: Cliente[] | null = await prisma.$queryRaw`
+      SELECT * FROM "Paises" p INNER JOIN "Clientes" c on p.id = "paisId" WHERE "empresaId" = ${aplication.empresaId} AND concat(p.codigo, c.whatsapp) = ${from} LIMIT 1;
+    `;
 
     // no existe el cliente TODO: REGISTRARLO
     if(clientResult?.length !== 1){
@@ -278,6 +283,9 @@ export const messagesController = async (req: Request, res: Response) => {
     return res.status(200).json(data);
   } catch (error) {
     console.log(error);
+    if(axios.isAxiosError(error)){
+      console.log(error.response?.data);
+    }
     res.status(200).json({ msg: 'Error' });
   }
 }

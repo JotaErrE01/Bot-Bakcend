@@ -33,11 +33,11 @@ model Mensaje {
   predecesorId          Int?
   altMessage            String?      @db.VarChar(1000)
   mensajeAsesor         Boolean?     @default(false)
+  backToMainCode        String?      @db.VarChar(20)
+  backToLastMessageCode String?      @db.VarChar(20)
+  repeatMessageCode     String?      @db.VarChar(20)
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
-  backToLastMessageCode String?      @db.VarChar(20)
-  backToMainCode        String?      @db.VarChar(20)
-  repeatMessageCode     String?      @db.VarChar(20)
   cliente               Cliente[]
   conversaciones        Conversacion @relation(fields: [conversacionId], references: [id])
   predecesor            Mensaje?     @relation("MessageSubMessage", fields: [predecesorId], references: [id])
@@ -55,11 +55,11 @@ model Usuario {
   password      String
   avatar        String?       @db.VarChar(100)
   roleId        Int?
+  status        Boolean?      @default(true)
   roleDefaultId String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   empresaId     String
-  status        Boolean?      @default(true)
   ChatHistory   ChatHistory[]
   Empresas      Empresas      @relation("EmpresasToUsuarios", fields: [empresaId], references: [id])
   RolesDefault  RolesDefault? @relation("RolesDefaultToUsuarios", fields: [roleDefaultId], references: [id])
@@ -92,12 +92,12 @@ model Cliente {
   apellido        String        @db.VarChar(100)
   nombreEmpresa   String?       @db.VarChar(100)
   whatsapp        String
-  codigo          Int
+  paisId          Int?
   email           String?       @db.VarChar(100)
   categoria1      String?
   categoria2      String?
-  num1            Int?
-  num2            Int?
+  num1            Decimal?      @db.Decimal(18, 2)
+  num2            Decimal?      @db.Decimal(18, 2)
   text1           String?
   text2           String?
   date1           DateTime?
@@ -112,6 +112,7 @@ model Cliente {
   ChatHistory     ChatHistory[]
   botId           Conversacion? @relation(fields: [conversacionId], references: [id])
   Empresas        Empresas      @relation("ClientesToEmpresas", fields: [empresaId], references: [id])
+  Paises          Paises?       @relation(fields: [paisId], references: [id])
   ultimoMensaje   Mensaje?      @relation(fields: [ultimoMensajeId], references: [id])
 
   @@map("Clientes")
@@ -150,7 +151,7 @@ model RegistroMensaje {
   descripcion     String
   templateUsed    String
   status          Status            @default(ENVIADO)
-  scheduledDate   String?
+  scheduledDate   DateTime?
   templateId      String?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
@@ -246,12 +247,22 @@ model ChatHistory {
   media     String?
   mediaType MediaType?
   isClient  Boolean    @default(false)
+  empresaId String
   createdAt DateTime   @default(now())
   updatedAt DateTime
-  empresaId String
   Usuario   Usuario?   @relation(fields: [asesorId], references: [id])
   Cliente   Cliente    @relation(fields: [clienteId], references: [id])
   Empresas  Empresas   @relation(fields: [empresaId], references: [id])
+}
+
+model Paises {
+  id        Int       @id @default(autoincrement())
+  longName  String    @db.VarChar(100)
+  shortName String    @db.VarChar(100)
+  codigo    Int       @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime
+  Cliente   Cliente[]
 }
 
 enum MediaType {
@@ -264,6 +275,7 @@ enum Status {
   ENVIADO
   ERROR
   EN_COLA
+  CANCELADO
 }
 
 enum Actions {

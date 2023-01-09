@@ -4,6 +4,7 @@ import { AxiosInstance } from 'axios';
 
 export const validCodes = async (client: any, text: string, botMessageData: any, metaApi: AxiosInstance, phoneId: string, isMainMessage: boolean) => {
   const { mensaje, cliente } = prisma;
+  const { longName, shortName, codigo, ...rest } = client;
 
   let msg: any = null;
   try {
@@ -25,7 +26,7 @@ export const validCodes = async (client: any, text: string, botMessageData: any,
             id: client.id,
           },
           data: {
-            ...client,
+            ...rest,
             ultimoMensajeId: msg.id,
           }
         });
@@ -46,7 +47,7 @@ export const validCodes = async (client: any, text: string, botMessageData: any,
             id: client.id,
           },
           data: {
-            ...client,
+            ...rest,
             ultimoMensajeId: msg.id,
           }
         });
