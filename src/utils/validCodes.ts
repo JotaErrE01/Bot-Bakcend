@@ -1,10 +1,11 @@
 import { prisma } from '../db/config';
 import { formatVariables } from './formatVariables';
 import { AxiosInstance } from 'axios';
+import { Cliente } from '@prisma/client';
 
 export const validCodes = async (client: any, text: string, botMessageData: any, metaApi: AxiosInstance, phoneId: string, isMainMessage: boolean) => {
   const { mensaje, cliente } = prisma;
-  const { longName, shortName, codigo, ...rest } = client;
+  const { longName, shortName, codigo, ...rest } = client;  
 
   let msg: any = null;
   try {
@@ -14,8 +15,10 @@ export const validCodes = async (client: any, text: string, botMessageData: any,
       }
     });
 
+    if(!mensajeDb || mensajeDb.isDeleted) throw new Error('No se encontro el mensaje');
+
     // verificar si quiere regresar al mensaje principal
-    if (text.toLowerCase() === mensajeDb?.backToMainCode?.toLowerCase() && !isMainMessage) {
+    if (text.toLowerCase() === mensajeDb.backToMainCode?.toLowerCase() && !isMainMessage) {
       msg = await mensaje.findFirst({
         where: { conversacionId: client.conversacionId, predecesorId: null }
       });
@@ -34,7 +37,7 @@ export const validCodes = async (client: any, text: string, botMessageData: any,
     }
 
     // verificar si quiere regresar al mensaje anterior
-    if (text.toLowerCase() === mensajeDb?.backToLastMessageCode?.toLowerCase() && !isMainMessage) {
+    if (text.toLowerCase() === mensajeDb.backToLastMessageCode?.toLowerCase() && !isMainMessage) {
       msg = await mensaje.findUnique({
         where: {
           id: mensajeDb.predecesorId!,
@@ -55,7 +58,7 @@ export const validCodes = async (client: any, text: string, botMessageData: any,
     }
 
     // verificar si quiere repetir el mensaje
-    if (text.toLowerCase() === mensajeDb?.repeatMessageCode?.toLowerCase()) {
+    if (text.toLowerCase() === mensajeDb.repeatMessageCode?.toLowerCase()) {
       msg = await mensaje.findUnique({
         where: {
           id: client.ultimoMensajeId,

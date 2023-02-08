@@ -8,15 +8,17 @@ datasource db {
 }
 
 model Conversacion {
-  id        Int       @id @default(autoincrement())
+  id        Int               @id @default(autoincrement())
   nombre    String
   categoria String
-  active    Boolean?  @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  active    Boolean?          @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
   empresaId String
+  type      ConversationType?
+  isDeleted Boolean?          @default(false)
   clientes  Cliente[]
-  Empresas  Empresas  @relation("ConversacionesToEmpresas", fields: [empresaId], references: [id])
+  Empresas  Empresas          @relation("ConversacionesToEmpresas", fields: [empresaId], references: [id])
   mensajes  Mensaje[]
 
   @@map("Conversaciones")
@@ -29,7 +31,6 @@ model Mensaje {
   palabrasClave         String
   cuerpo                String?      @db.VarChar(1000)
   mediaType             MediaType?
-  link                  String?
   predecesorId          Int?
   altMessage            String?      @db.VarChar(1000)
   mensajeAsesor         Boolean?     @default(false)
@@ -38,6 +39,10 @@ model Mensaje {
   repeatMessageCode     String?      @db.VarChar(20)
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
+  botIdConexion         Int?
+  editable              Boolean?     @default(true)
+  fileName              String?
+  isDeleted             Boolean?     @default(false)
   cliente               Cliente[]
   conversaciones        Conversacion @relation(fields: [conversacionId], references: [id])
   predecesor            Mensaje?     @relation("MessageSubMessage", fields: [predecesorId], references: [id])
@@ -47,23 +52,27 @@ model Mensaje {
 }
 
 model Usuario {
-  id            Int           @id @default(autoincrement())
-  nombre        String        @db.VarChar(100)
-  apellido      String        @db.VarChar(100)
-  whatsapp      String        @unique
-  email         String        @unique
-  password      String
-  avatar        String?       @db.VarChar(100)
-  roleId        Int?
-  status        Boolean?      @default(true)
-  roleDefaultId String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  empresaId     String
-  ChatHistory   ChatHistory[]
-  Empresas      Empresas      @relation("EmpresasToUsuarios", fields: [empresaId], references: [id])
-  RolesDefault  RolesDefault? @relation("RolesDefaultToUsuarios", fields: [roleDefaultId], references: [id])
-  Roles         Roles?        @relation("RolesToUsuarios", fields: [roleId], references: [id])
+  id                Int                 @id @default(autoincrement())
+  nombre            String              @db.VarChar(100)
+  apellido          String              @db.VarChar(100)
+  whatsapp          String              @unique
+  email             String              @unique
+  password          String
+  avatar            String?             @db.VarChar(100)
+  roleId            Int?
+  status            Boolean?            @default(true)
+  roleDefaultId     String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  empresaId         String
+  maxChats          Int                 @default(0)
+  quantityChats     Int?                @default(0)
+  isDeleted         Boolean?            @default(false)
+  ChatHistory       ChatHistory[]
+  RespuestasRapidas RespuestasRapidas[]
+  Empresas          Empresas            @relation("EmpresasToUsuarios", fields: [empresaId], references: [id])
+  RolesDefault      RolesDefault?       @relation("RolesDefaultToUsuarios", fields: [roleDefaultId], references: [id])
+  Roles             Roles?              @relation("RolesToUsuarios", fields: [roleId], references: [id])
 
   @@map("Usuarios")
 }
@@ -71,16 +80,18 @@ model Usuario {
 model App {
   id                Int      @id @default(autoincrement())
   nombre            String   @db.VarChar(50)
-  appId             String?  @unique
-  token             String?  @unique
-  businessAccountId String?  @unique
-  phoneNumberId     String?  @unique
+  appId             String?
+  token             String?
+  businessAccountId String?
+  phoneNumberId     String?
   webHookApi        String?  @unique
   webHookToken      String?  @unique
   secretKey         String?  @unique
-  empresaId         String   @unique
+  empresaId         String
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  active            Boolean? @default(true)
+  isDeleted         Boolean? @default(false)
   Empresas          Empresas @relation("AppsToEmpresas", fields: [empresaId], references: [id])
 
   @@map("Apps")
@@ -109,6 +120,7 @@ model Cliente {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   empresaId       String
+  isDeleted       Boolean?      @default(false)
   ChatHistory     ChatHistory[]
   botId           Conversacion? @relation(fields: [conversacionId], references: [id])
   Empresas        Empresas      @relation("ClientesToEmpresas", fields: [empresaId], references: [id])
@@ -125,6 +137,7 @@ model MensajeLog {
   recipentId String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  isDeleted  Boolean? @default(false)
 
   @@map("MensajeLogs")
 }
@@ -140,6 +153,7 @@ model RegistroCarga {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   empresaId      String
+  isDeleted      Boolean?         @default(false)
   DetallesCargas DetallesCargas[] @relation("DetallesCargasToRegistrosCargas")
   Empresas       Empresas         @relation("EmpresasToRegistrosCargas", fields: [empresaId], references: [id])
 
@@ -156,6 +170,7 @@ model RegistroMensaje {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   empresaId       String
+  isDeleted       Boolean?          @default(false)
   CampaignDetails CampaignDetails[] @relation("CampaignDetailsToRegistrosMensajes")
   Empresas        Empresas          @relation("EmpresasToRegistrosMensajes", fields: [empresaId], references: [id])
 
@@ -172,6 +187,7 @@ model DetallesCargas {
   status          String
   createdAt       DateTime      @default(now())
   updatedAt       DateTime
+  isDeleted       Boolean?      @default(false)
   RegistrosCargas RegistroCarga @relation("DetallesCargasToRegistrosCargas", fields: [registroCargaId], references: [id])
 }
 
@@ -189,6 +205,7 @@ model CampaignDetails {
   whatsappMessageId String?         @unique
   createdAt         DateTime        @default(now())
   updatedAt         DateTime
+  isDeleted         Boolean?        @default(false)
   RegistroMensaje   RegistroMensaje @relation("CampaignDetailsToRegistrosMensajes", fields: [registroMensajeId], references: [id])
 }
 
@@ -209,7 +226,8 @@ model Empresas {
   logo            String?           @db.VarChar(100)
   createdAt       DateTime          @default(now())
   updatedAt       DateTime
-  App             App?              @relation("AppsToEmpresas")
+  isDeleted       Boolean?          @default(false)
+  App             App[]             @relation("AppsToEmpresas")
   ChatHistory     ChatHistory[]
   Cliente         Cliente[]         @relation("ClientesToEmpresas")
   Conversacion    Conversacion[]    @relation("ConversacionesToEmpresas")
@@ -225,6 +243,7 @@ model Roles {
   empresaId String
   createdAt DateTime   @default(now())
   updatedAt DateTime
+  isDeleted Boolean?   @default(false)
   Empresas  Empresas   @relation(fields: [empresaId], references: [id])
   Usuario   Usuario[]  @relation("RolesToUsuarios")
   Acciones  Acciones[] @relation("AccionToRol")
@@ -235,6 +254,7 @@ model RolesDefault {
   nombre    DefaultRoles @unique
   createdAt DateTime     @default(now())
   updatedAt DateTime
+  isDeleted Boolean?     @default(false)
   Usuario   Usuario[]    @relation("RolesDefaultToUsuarios")
   Acciones  Acciones[]   @relation("AccionToRolDefault")
 }
@@ -250,6 +270,7 @@ model ChatHistory {
   empresaId String
   createdAt DateTime   @default(now())
   updatedAt DateTime
+  isDeleted Boolean?   @default(false)
   Usuario   Usuario?   @relation(fields: [asesorId], references: [id])
   Cliente   Cliente    @relation(fields: [clienteId], references: [id])
   Empresas  Empresas   @relation(fields: [empresaId], references: [id])
@@ -262,13 +283,42 @@ model Paises {
   codigo    Int       @unique
   createdAt DateTime  @default(now())
   updatedAt DateTime
+  isDeleted Boolean?  @default(false)
   Cliente   Cliente[]
+}
+
+model Encuestas {
+  id               Int      @id @default(autoincrement())
+  empresaId        String
+  conversacionId   Int
+  mensajeId        Int
+  mensajePregunta  String   @db.VarChar(1000)
+  clienteId        Int
+  nombreCliente    String   @db.VarChar(100)
+  apellidoCliente  String   @db.VarChar(100)
+  whatsappCliente  String   @db.VarChar(20)
+  respuestaCliente String   @db.VarChar(100)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime
+  isDeleted        Boolean? @default(false)
+}
+
+model RespuestasRapidas {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @db.VarChar(100)
+  mensaje   String   @db.VarChar(1000)
+  usuarioId Int
+  isDeleted Boolean? @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Usuarios  Usuario  @relation(fields: [usuarioId], references: [id])
 }
 
 enum MediaType {
   IMAGE
   VIDEO
   DOCUMENT
+  AUDIO
 }
 
 enum Status {
@@ -309,10 +359,16 @@ enum Actions {
   VER_ROL
   CREAR_CAMPAIGNS
   VER_LOGS
+  CHAT_PERMISSION
 }
 
 enum DefaultRoles {
   ADMIN
   OPERADOR
   CREADOR_PLANTILLAS
+  AGENTE
+}
+
+enum ConversationType {
+  DEFAULT
 }

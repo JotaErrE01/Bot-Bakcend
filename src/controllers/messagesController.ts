@@ -1,11 +1,11 @@
 import { Request, Response } from "express";
 import { Server as SocketServer } from 'socket.io';
 import { DefaultEventsMap } from "socket.io/dist/typed-events";
-import { App, Mensaje, Cliente } from '@prisma/client';
-import { formatVariables, Messages, getReqType, Templates, sendMedia, validCodes } from "../utils";
+import axios from 'axios';
+import { App, Mensaje, Cliente, Usuario } from '@prisma/client';
+import { formatVariables, Messages, getReqType, Templates, sendMedia, validCodes, connectToOtherBot, RegisterBot, registerClient, savePollResults, agentLogic } from "../utils";
 import { MetaApi } from "../api";
 import { prisma } from "../db";
-import axios from 'axios';
 
 // funcion para validar el token con meta
 export const validarWebHookToken = async (req: Request, res: Response) => {
@@ -16,7 +16,8 @@ export const validarWebHookToken = async (req: Request, res: Response) => {
 
   try {
     const application = await app.findUnique({ where: { webHookToken: token?.toString() } });
-    if (!application) return res.status(401).json({ msg: 'Access Denied' });
+
+    if (!application || application.isDeleted) return res.status(401).json({ msg: 'Access Denied' });
 
     if (application.webHookApi !== `${process.env.APP_HOST}/${webHookApi}`) return res.status(401).json({ msg: 'Access Denied' });
 
@@ -28,11 +29,11 @@ export const validarWebHookToken = async (req: Request, res: Response) => {
 }
 
 // funcion para controlar los mensajes de whatsapp
-export const messagesController = async (req: Request, res: Response) => {  
+export const messagesController = async (req: Request, res: Response) => {
   try {
     const io: SocketServer<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any> = (req as any).io;
     const { webHookApi } = req.params;
-    const { app, campaignDetails } = prisma;
+    const { app, campaignDetails, usuario } = prisma;
 
     if (!webHookApi) return res.status(200).json({ msg: 'WebHookApi no encontrado' });
 
@@ -92,13 +93,13 @@ export const messagesController = async (req: Request, res: Response) => {
       return res.status(200).json({ msg: `Menssage ${dataMessage.status}` });
     }
 
-    const { phoneId, from, text, messageId, name } = dataMessage;
+    const { phoneId, from, text, messageId, name, waId } = dataMessage;
     if (!phoneId || !from || !text || !messageId || !name) {
       return res.status(200).json({ msg: 'No hay mensajes' });
     }
 
     // create prisma instance
-    const { cliente, mensaje, mensajeLog, chatHistory } = prisma;
+    const { cliente, mensaje, mensajeLog, chatHistory, conversacion } = prisma;
 
     // CONTROLAR QUE META NO ENVIE EL MISMO MENSAJE
     const message = await mensajeLog.findUnique({
@@ -127,107 +128,62 @@ export const messagesController = async (req: Request, res: Response) => {
         body: 'Hola!, No te tenemos registrado en nuestra base de datos, pero con gusto te atenderemos.',
       },
     };
-    
-    // verificar si el cliente existe
-    // let clientResult: Cliente[] | null = await prisma.$queryRaw`SELECT * FROM "Clientes" WHERE "empresaId" = ${aplication.empresaId} AND concat("codigo", "whatsapp") = ${from} LIMIT 1`;
 
-    let clientResult: Cliente[] | null = await prisma.$queryRaw`
-      SELECT * FROM "Paises" p INNER JOIN "Clientes" c on p.id = "paisId" WHERE "empresaId" = ${aplication.empresaId} AND concat(p.codigo, c.whatsapp) = ${from} LIMIT 1;
+    const clientResult: Cliente[] | null = await prisma.$queryRaw`
+      SELECT * FROM "Paises" p INNER JOIN "Clientes" c on p.id = "paisId" WHERE "empresaId" = ${aplication.empresaId} AND concat(p.codigo, c.whatsapp) = ${from} AND c."isDeleted" = false LIMIT 1;
     `;
 
-    // no existe el cliente TODO: REGISTRARLO
-    if(clientResult?.length !== 1){
-      await metaApi.post(`/${phoneId}/messages`, botMessageData);
-      return res.status(200).json({ msg: 'Mensaje enviado' });
+    // no existe el cliente TODO: BOT DE REGISTRO
+    if (clientResult?.length !== 1) {
+      return await RegisterBot(aplication.empresaId, metaApi, phoneId, botMessageData, waId!, res);
     }
 
-    let client = clientResult[0];
+    const client = clientResult[0];
+    if (client.nombre === 'REGISTER' || client.apellido === 'REGISTER')
+      return await registerClient(client, text, res, metaApi, phoneId, botMessageData);
 
     let msg;
 
-    if (!client.conversacionId) {
+    if (!client.conversacionId && !client.isChating) {
+      // TODO: CONTESTAR BOT POR DEFECTO
       botMessageData.text.body = 'Perdon, no tengo una conversacion asignada para ti 😢';
       await metaApi.post(`/${phoneId}/messages`, botMessageData);
       return res.status(200).json({ msg: 'Message Sent' });
     }
 
-    if (client.ultimoMensajeId || client.isChating) {
-      console.log('🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖');
 
-      let lastMessage: Mensaje | null = null;
-      if (client.ultimoMensajeId) {
-        lastMessage = await mensaje.findUnique({
-          where: {
-            id: client.ultimoMensajeId,
-          }
-        });
-      }
+    // if (client.ultimoMensajeId || client.isChating) {
+    //   let lastMessage: Mensaje | null = null;
+    //   if (client.ultimoMensajeId) {
+    //     lastMessage = await mensaje.findUnique({
+    //       where: {
+    //         id: client.ultimoMensajeId,
+    //       }
+    //     });
+    //   }
 
-      if (lastMessage?.mensajeAsesor || client.isChating) {
-        console.log('🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖🤖');
-        // actualizamos el cliente de la base de datos
-        if (!client.isChating) {
-          await cliente.update({
-            where: {
-              id: client.id,
-            },
-            data: {
-              ...client,
-              isChating: true
-            }
-          });
-        }
+    //   if (lastMessage && !lastMessage.isDeleted && (lastMessage.mensajeAsesor || client.isChating)) {
+    //   }
+    // }
+    if (client.isChating) return agentLogic(client, aplication, io, res, text);
 
-        if (client.chatAsesorId) {
-          const chat = {
-            mensaje: text,
-            clienteId: client.id,
-            asesorId: client.chatAsesorId,
-            isClient: true,
-            empresaId: aplication.empresaId,
-          }
-
-          io.to(client.chatAsesorId.toString()).emit('personal-message', chat);
-        } else {
-          const empresaId = aplication.empresaId.toString();
-          const chat = await chatHistory.create({
-            data: {
-              mensaje: text,
-              clienteId: client.id,
-              isClient: true,
-              asesorId: null,
-              empresaId,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-            include: {
-              Cliente: true,
-            }
-          });
-
-          io.to(empresaId).emit('enterprise-message', chat);
-        }
-
-        return res.status(200).json({ msg: 'Mensaje enviado' });
-      }
-    }
-
-    if(client.ultimoMensajeId){
+    if (client.ultimoMensajeId) {
       const result = await validCodes(client, text, botMessageData, metaApi, phoneId, !client.ultimoMensajeId);
-      if(result) return res.status(200).json({ msg: 'Mensaje enviado' });
-    } 
+      if (result) return res.status(200).json({ msg: 'Mensaje enviado' });
+    }
 
     // Si no tiene un mensaje, buscar el mensaje principal
     if (!client.ultimoMensajeId) {
       msg = await mensaje.findFirst({
-        where: { conversacionId: client.conversacionId, predecesorId: null }
+        where: { conversacionId: client.conversacionId!, predecesorId: null, isDeleted: false },
+        include: { conversaciones: true }
       });
 
       if (!msg?.anyWord) {
         const palabrasClave = msg!.palabrasClave.split(',');
         const palabraClave = palabrasClave.find(palabra => palabra.toLowerCase() === text.toLowerCase());
 
-        // si anyword es falso y no hay palabras clave, enviar un mensaje de no entendi
+        // si anyword es falso y no hay palabras clave, enviar el mensaje alternativo o el mensaje de no entiendo
         if (!palabraClave) {
           botMessageData.text.body = msg?.altMessage || 'Perdon, no entiendo tu mensaje 😢';
           await metaApi.post(`/${phoneId}/messages`, botMessageData);
@@ -237,28 +193,48 @@ export const messagesController = async (req: Request, res: Response) => {
     } else {
       // Encuentra todos los hijos del ultimo mensaje
       const msgs = await mensaje.findMany({
-        where: { conversacionId: client.conversacionId, predecesorId: client.ultimoMensajeId }
+        where: { conversacionId: client.conversacionId!, predecesorId: client.ultimoMensajeId, isDeleted: false },
+        include: { conversaciones: true }
       });
 
-      // Encuentra el mensaje a enviar por la palabra clave
-      msg = msgs.find(({ palabrasClave }) => {
-        const palabrasClaveArray = palabrasClave.split(',');
-        return palabrasClaveArray.find(palabra => text.toLowerCase() === palabra.toLowerCase());
-      });
+      const existeMensajeAnyWord = msgs.find(msg => msg.anyWord);
+      if (!existeMensajeAnyWord) {
+        // console.log('🌌🌌🌌🌌🌌🌌🌌🌌🌌🌌🌌', palabrasClave.split(','))
+        // Encuentra el mensaje a enviar por la palabra clave
+        msg = msgs.find(({ palabrasClave }) => {
+          const palabrasClaveArray = palabrasClave.split(',').map(palabra => palabra.trim());
+          return palabrasClaveArray.find(palabra => text.toLowerCase() === palabra.toLowerCase());
+        });
+      } else {
+        msg = existeMensajeAnyWord;
+      }
 
       // Si no encuentra el mensaje, enviar un mensaje de no entendi
       if (!msg) {
         const mensajeNoEntendi = await mensaje.findUnique({
           where: { id: client.ultimoMensajeId }
         });
+
         // manejando las variables en el mensaje alternativo
         botMessageData.text.body = formatVariables(mensajeNoEntendi?.altMessage, client) || 'Perdon, no entiendo tu mensaje 😢';
 
         await metaApi.post(`/${phoneId}/messages`, botMessageData);
         return res.status(200).json({ msg: 'Message Sent' });
       }
+
+
+      // verfica si es un mensaje que conecta con otro Bot
+      if (msg.botIdConexion)
+        return await connectToOtherBot(msg, client, metaApi, botMessageData, phoneId, res);
+
       // TODO: ver que hacer si no encuentra ningun mensaje hijo
       // res.end();
+    }
+
+    // Verificar si el bot es un bot de encuesta
+    if (msg?.conversaciones.categoria === 'POLL') {
+      const result = await savePollResults(text, client);
+      if (!result) return res.status(200).json({ msg: 'Error en encuestas' });
     }
 
     // Actualizar ultimo mensaje del cliente
@@ -278,12 +254,17 @@ export const messagesController = async (req: Request, res: Response) => {
 
     botMessageData.text.body = formatVariables((msg!.cuerpo as string), client)!;
 
+    if (msg.mensajeAsesor) {
+      await metaApi.post(`/${phoneId}/messages`, botMessageData);
+      return agentLogic(client, aplication, io, res, text);
+    }
+
     const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);
 
     return res.status(200).json(data);
   } catch (error) {
     console.log(error);
-    if(axios.isAxiosError(error)){
+    if (axios.isAxiosError(error)) {
       console.log(error.response?.data);
     }
     res.status(200).json({ msg: 'Error' });

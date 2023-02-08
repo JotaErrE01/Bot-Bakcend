@@ -7,6 +7,7 @@ export interface IGetDataMessage {
   status?: 'read' | 'sent' | 'delivered';
   messageId?: string;
   name?: string;
+  waId?: string;
 }
 
 export const getDataMessage = (data: IWebHookText.IWebHookText & IWebHookStatus.IWebHookStatus): Promise<IGetDataMessage | null> => {
@@ -62,13 +63,15 @@ const validateMessage = (entry: IWebHookText.Entry) => {
       const text = messageData.messages[0].text.body;
       const messageId = messageData.messages[0].id;  
       const name = messageData.contacts[0].profile.name;
+      const waId = messageData.contacts[0].wa_id;
 
       const botMessage: IGetDataMessage = {
         phoneId,
         from,
         text,
         messageId,
-        name
+        name,
+        waId
       };
 
       return botMessage;

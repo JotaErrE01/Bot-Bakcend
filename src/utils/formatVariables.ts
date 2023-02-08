@@ -13,15 +13,24 @@ export const formatVariables = (msg: string | null | undefined, client: Cliente)
       let replacer = '';
       if (key === 'fecha1') key = 'date1';
       if (key === 'fecha2') key = 'date2';
-      if(client[(key as keyof Cliente)]) replacer = <string>client[(key as keyof Cliente)!];
-      if(key === 'nombre') replacer = `${client.nombre} ${client.apellido}`;
+      if (client[(key as keyof Cliente)]) replacer = <string>client[(key as keyof Cliente)!];
+      if (key === 'nombre') replacer = `${client.nombre} ${client.apellido}`;
 
       // Format date
-      if(key.includes('date')) {
+      if (key.includes('date')) {
         replacer = new Date(replacer)
           .toLocaleDateString('es-AR', { dateStyle: 'medium' })
           .replaceAll(' ', '-');
       };
+
+      if (key.includes('num')) {
+        replacer = new Intl.NumberFormat('en-US', {
+          style: 'decimal',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(Number(replacer));
+        replacer.toString();
+      }
 
       altMessage = altMessage.replaceAll(variable, `${replacer}`);
     }

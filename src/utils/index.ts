@@ -4,3 +4,8 @@ export * from './formatVariables';
 export * from './getReqType';
 export * from './sendMedia';
 export * from './validCodes';
+export * from './connectToOtherBot';
+export * from './RegisterBot';
+export * from './registerClient';
+export * from './savePollResults';
+export * from './agentLogic';
