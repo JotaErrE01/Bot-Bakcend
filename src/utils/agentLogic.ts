@@ -93,7 +93,7 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
             id: client.id,
           },
           data: {
-            chatAsesorId: asesor.id,
+            chatAsesorId: BigInt(Number(asesor.id)),
           }
         });
 

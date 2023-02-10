@@ -116,7 +116,7 @@ model Cliente {
   conversacionId  Int?
   ultimoMensajeId Int?
   isChating       Boolean?      @default(false)
-  chatAsesorId    Int?
+  chatAsesorId    BigInt?
   isDeleted       Boolean?      @default(false)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -293,7 +293,7 @@ model Encuestas {
   conversacionId   Int
   mensajeId        Int
   mensajePregunta  String   @db.VarChar(1000)
-  clienteId        Int
+  clienteId        BigInt
   nombreCliente    String   @db.VarChar(100)
   apellidoCliente  String   @db.VarChar(100)
   whatsappCliente  String   @db.VarChar(20)
