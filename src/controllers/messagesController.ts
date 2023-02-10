@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { Server as SocketServer } from 'socket.io';
 import { DefaultEventsMap } from "socket.io/dist/typed-events";
 import axios from 'axios';
-import { App, Mensaje, Cliente, Usuario } from '@prisma/client';
+import { App, Cliente } from '@prisma/client';
 import { formatVariables, Messages, getReqType, Templates, sendMedia, validCodes, connectToOtherBot, RegisterBot, registerClient, savePollResults, agentLogic } from "../utils";
 import { MetaApi } from "../api";
 import { prisma } from "../db";
@@ -138,7 +138,7 @@ export const messagesController = async (req: Request, res: Response) => {
       return await RegisterBot(aplication.empresaId, metaApi, phoneId, botMessageData, waId!, res);
     }
 
-    const client = clientResult[0];
+    let client = clientResult[0];
     if (client.nombre === 'REGISTER' || client.apellido === 'REGISTER')
       return await registerClient(client, text, res, metaApi, phoneId, botMessageData);
 
@@ -146,9 +146,38 @@ export const messagesController = async (req: Request, res: Response) => {
 
     if (!client.conversacionId && !client.isChating) {
       // TODO: CONTESTAR BOT POR DEFECTO
-      botMessageData.text.body = 'Perdon, no tengo una conversacion asignada para ti 😢';
-      await metaApi.post(`/${phoneId}/messages`, botMessageData);
-      return res.status(200).json({ msg: 'Message Sent' });
+
+      const defaultBot = await conversacion.findFirst({
+        where: {
+          isDeleted: false,
+          active: true,
+          categoria: 'DEFAULT',
+        },
+        include: {
+          mensajes: {
+            where: {
+              isDeleted: false,
+              predecesorId: null,
+            }
+          }
+        },
+      });
+
+      if (!defaultBot) {
+        // UPDATE CONVERSATIONID TO DEFAULT BOT
+        botMessageData.text.body = 'Perdon, no tengo una conversacion asignada para ti 😢';
+        await metaApi.post(`/${phoneId}/messages`, botMessageData);
+        return res.status(200).json({ msg: 'Message Sent' });
+      }
+
+      client = await cliente.update({
+        where: {
+          id: client.id,
+        },
+        data: {
+          conversacionId: defaultBot.id
+        }
+      });
     }
 
 
@@ -174,10 +203,17 @@ export const messagesController = async (req: Request, res: Response) => {
 
     // Si no tiene un mensaje, buscar el mensaje principal
     if (!client.ultimoMensajeId) {
+      console.log('================')
+      console.log('================')
+      console.log({client});
+      console.log('================')
+      console.log('================')
       msg = await mensaje.findFirst({
         where: { conversacionId: client.conversacionId!, predecesorId: null, isDeleted: false },
         include: { conversaciones: true }
       });
+
+      console.log({msg});
 
       if (!msg?.anyWord) {
         const palabrasClave = msg!.palabrasClave.split(',');
@@ -249,10 +285,10 @@ export const messagesController = async (req: Request, res: Response) => {
 
     // enviar media si existe en el mensaje
     const mediaSent = await sendMedia(msg, mediaObj, phoneId, metaApi);
-    if (!mediaSent) return res.status(200).json({ msg: 'Message Sent' });
-    if (!msg?.cuerpo) return res.status(200).json({ msg: 'Message Sent' });
+    if (!mediaSent) return res.status(400).json({ msg: 'Error sending media' });
+    if (!msg?.cuerpo) return res.status(404).json({ msg: 'Body in message not found' });
 
-    botMessageData.text.body = formatVariables((msg!.cuerpo as string), client)!;
+    botMessageData.text.body = formatVariables((msg.cuerpo as string), client)!;
 
     if (msg.mensajeAsesor) {
       await metaApi.post(`/${phoneId}/messages`, botMessageData);
@@ -267,7 +303,7 @@ export const messagesController = async (req: Request, res: Response) => {
     if (axios.isAxiosError(error)) {
       console.log(error.response?.data);
     }
-    res.status(200).json({ msg: 'Error' });
+    res.status(400).json({ msg: 'Error' });
   }
 }
 
