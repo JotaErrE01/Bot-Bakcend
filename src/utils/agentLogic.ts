@@ -133,6 +133,6 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
   } catch (error) {
     console.log(error);
     console.log('Error en SOCKETS AGENTE LOGIC')
-    return res.status(200).json({ msg: 'Error en el servidor' });
+    return res.status(400).json({ msg: 'Error en el servidor' });
   }
 }
