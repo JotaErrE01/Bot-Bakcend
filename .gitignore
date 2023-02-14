@@ -7,3 +7,5 @@ tunel.js
 source.txt
 dist/
 ngrok.exe
+.DS_Store
+

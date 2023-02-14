@@ -180,20 +180,6 @@ export const messagesController = async (req: Request, res: Response) => {
       });
     }
 
-
-    // if (client.ultimoMensajeId || client.isChating) {
-    //   let lastMessage: Mensaje | null = null;
-    //   if (client.ultimoMensajeId) {
-    //     lastMessage = await mensaje.findUnique({
-    //       where: {
-    //         id: client.ultimoMensajeId,
-    //       }
-    //     });
-    //   }
-
-    //   if (lastMessage && !lastMessage.isDeleted && (lastMessage.mensajeAsesor || client.isChating)) {
-    //   }
-    // }
     if (client.isChating) return agentLogic(client, aplication, io, res, text);
 
     if (client.ultimoMensajeId) {
@@ -203,17 +189,10 @@ export const messagesController = async (req: Request, res: Response) => {
 
     // Si no tiene un mensaje, buscar el mensaje principal
     if (!client.ultimoMensajeId) {
-      console.log('================')
-      console.log('================')
-      console.log({client});
-      console.log('================')
-      console.log('================')
       msg = await mensaje.findFirst({
         where: { conversacionId: client.conversacionId!, predecesorId: null, isDeleted: false },
         include: { conversaciones: true }
       });
-
-      console.log({msg});
 
       if (!msg?.anyWord) {
         const palabrasClave = msg!.palabrasClave.split(',');
@@ -235,8 +214,6 @@ export const messagesController = async (req: Request, res: Response) => {
 
       const existeMensajeAnyWord = msgs.find(msg => msg.anyWord);
       if (!existeMensajeAnyWord) {
-        // console.log('🌌🌌🌌🌌🌌🌌🌌🌌🌌🌌🌌', palabrasClave.split(','))
-        // Encuentra el mensaje a enviar por la palabra clave
         msg = msgs.find(({ palabrasClave }) => {
           const palabrasClaveArray = palabrasClave.split(',').map(palabra => palabra.trim());
           return palabrasClaveArray.find(palabra => text.toLowerCase() === palabra.toLowerCase());

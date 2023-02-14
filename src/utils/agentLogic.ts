@@ -2,6 +2,7 @@ import { Usuario, Cliente, App } from '@prisma/client';
 import { Server as SocketServer } from 'socket.io';
 import { prisma } from '../db/config';
 import { Response } from 'express';
+import { serializeBigInt } from './serializedBigInt';
 
 export const agentLogic = async (client: Cliente, aplication: App, io: SocketServer, res: Response, text: string) => {
   const { usuario, cliente, chatHistory, rolesDefault, roles } = prisma;
@@ -126,7 +127,7 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           Cliente: true,
         }
       });
-      io.to(empresaId).emit('enterprise-message', chat);
+      io.to(empresaId).emit('enterprise-message', serializeBigInt(chat));
     }
 
     return res.status(200).json({ msg: 'Mensaje enviado' });
