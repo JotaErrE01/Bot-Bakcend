@@ -93,13 +93,13 @@ export const messagesController = async (req: Request, res: Response) => {
       return res.status(200).json({ msg: `Menssage ${dataMessage.status}` });
     }
 
-    const { phoneId, from, text, messageId, name, waId } = dataMessage;
-    if (!phoneId || !from || !text || !messageId || !name) {
+    const { phoneId, from, text, messageId, name, waId, mediaData } = dataMessage;
+    if (!phoneId || !from || !messageId || !name) {
       return res.status(200).json({ msg: 'No hay mensajes' });
     }
 
     // create prisma instance
-    const { cliente, mensaje, mensajeLog, chatHistory, conversacion } = prisma;
+    const { cliente, mensaje, mensajeLog, conversacion } = prisma;
 
     // CONTROLAR QUE META NO ENVIE EL MISMO MENSAJE
     const message = await mensajeLog.findUnique({
@@ -128,9 +128,12 @@ export const messagesController = async (req: Request, res: Response) => {
         body: 'Hola!, No te tenemos registrado en nuestra base de datos, pero con gusto te atenderemos.',
       },
     };
-
+    // const postGres = `SELECT * FROM "Paises" p INNER JOIN "Clientes" c on p.id = "paisId" WHERE "empresaId" = ${aplication.empresaId} AND concat(p.codigo, c.whatsapp) = ${from} AND c."isDeleted" = false LIMIT 1;`;
+    // const mysqlQuery = `SELECT * FROM Paises p INNER JOIN Clientes c on p.id = paisId WHERE empresaId = "9af9a1a7-80e9-429d-b6ea-57c6a14ba5a6" AND concat(p.codigo, c.whatsapp) = 593986269671 AND c.isDeleted = false LIMIT 1;`
+    // console.log(`
+    //   SELECT * FROM Paises p INNER JOIN Clientes c on p.id = paisId WHERE empresaId = ${aplication.empresaId} AND concat(p.codigo, c.whatsapp) = ${from} AND c.isDeleted = false LIMIT 1;`)
     const clientResult: Cliente[] | null = await prisma.$queryRaw`
-      SELECT * FROM "Paises" p INNER JOIN "Clientes" c on p.id = "paisId" WHERE "empresaId" = ${aplication.empresaId} AND concat(p.codigo, c.whatsapp) = ${from} AND c."isDeleted" = false LIMIT 1;
+      SELECT * FROM Paises p INNER JOIN Clientes c on p.id = paisId WHERE empresaId = ${aplication.empresaId} AND concat(p.codigo, c.whatsapp) = ${from} AND c.isDeleted = false LIMIT 1;
     `;
 
     // no existe el cliente TODO: BOT DE REGISTRO
@@ -139,7 +142,7 @@ export const messagesController = async (req: Request, res: Response) => {
     }
 
     let client = clientResult[0];
-    if (client.nombre === 'REGISTER' || client.apellido === 'REGISTER')
+    if ((client.nombre === 'REGISTER' || client.apellido === 'REGISTER') && text)
       return await registerClient(client, text, res, metaApi, phoneId, botMessageData);
 
     let msg;
@@ -180,15 +183,15 @@ export const messagesController = async (req: Request, res: Response) => {
       });
     }
 
-    if (client.isChating) return agentLogic(client, aplication, io, res, text);
+    if (client.isChating) return agentLogic(client, aplication, io, res, text, mediaData);
 
-    if (client.ultimoMensajeId) {
+    if (client.ultimoMensajeId && text) {
       const result = await validCodes(client, text, botMessageData, metaApi, phoneId, !client.ultimoMensajeId);
       if (result) return res.status(200).json({ msg: 'Mensaje enviado' });
     }
 
     // Si no tiene un mensaje, buscar el mensaje principal
-    if (!client.ultimoMensajeId) {
+    if (!client.ultimoMensajeId && text) {
       msg = await mensaje.findFirst({
         where: { conversacionId: client.conversacionId!, predecesorId: null, isDeleted: false },
         include: { conversaciones: true }
@@ -196,7 +199,7 @@ export const messagesController = async (req: Request, res: Response) => {
 
       if (!msg?.anyWord) {
         const palabrasClave = msg!.palabrasClave.split(',');
-        const palabraClave = palabrasClave.find(palabra => palabra.toLowerCase() === text.toLowerCase());
+        const palabraClave = palabrasClave.find(palabra => palabra.toLowerCase() === text?.toLowerCase());
 
         // si anyword es falso y no hay palabras clave, enviar el mensaje alternativo o el mensaje de no entiendo
         if (!palabraClave) {
@@ -205,7 +208,7 @@ export const messagesController = async (req: Request, res: Response) => {
           return res.status(200).json({ msg: 'Message Sent' });
         }
       }
-    } else {
+    } else if(text) {
       // Encuentra todos los hijos del ultimo mensaje
       const msgs = await mensaje.findMany({
         where: { conversacionId: client.conversacionId!, predecesorId: client.ultimoMensajeId, isDeleted: false },
@@ -225,7 +228,7 @@ export const messagesController = async (req: Request, res: Response) => {
       // Si no encuentra el mensaje, enviar un mensaje de no entendi
       if (!msg) {
         const mensajeNoEntendi = await mensaje.findUnique({
-          where: { id: client.ultimoMensajeId }
+          where: { id: client.ultimoMensajeId || undefined },
         });
 
         // manejando las variables en el mensaje alternativo
@@ -245,7 +248,7 @@ export const messagesController = async (req: Request, res: Response) => {
     }
 
     // Verificar si el bot es un bot de encuesta
-    if (msg?.conversaciones.categoria === 'POLL') {
+    if (msg?.conversaciones.categoria === 'POLL' && text) {
       const result = await savePollResults(text, client);
       if (!result) return res.status(200).json({ msg: 'Error en encuestas' });
     }
@@ -253,23 +256,18 @@ export const messagesController = async (req: Request, res: Response) => {
     // Actualizar ultimo mensaje del cliente
     await cliente.update({ where: { id: client.id }, data: { ultimoMensajeId: msg?.id } });
 
-    let mediaObj = {
-      "messaging_product": "whatsapp",
-      "recipient_type": "individual",
-      "to": `${from}`,
-      "type": ""
-    };
-
     // enviar media si existe en el mensaje
-    const mediaSent = await sendMedia(msg, mediaObj, phoneId, metaApi);
-    if (!mediaSent) return res.status(400).json({ msg: 'Error sending media' });
-    if (!msg?.cuerpo) return res.status(404).json({ msg: 'Body in message not found' });
+    if(msg?.mediaType) {
+      const result = await sendMedia(msg, phoneId, metaApi, from);
+      if (!result) return res.status(400).json({ msg: 'Error sending media' });
+      return res.status(200).json({ msg: 'Message Sent' });
+    }
 
-    botMessageData.text.body = formatVariables((msg.cuerpo as string), client)!;
+    botMessageData.text.body = formatVariables((msg?.cuerpo as string), client)!;
 
-    if (msg.mensajeAsesor) {
+    if (msg?.mensajeAsesor) {
       await metaApi.post(`/${phoneId}/messages`, botMessageData);
-      return agentLogic(client, aplication, io, res, text);
+      return agentLogic(client, aplication, io, res, text, mediaData);
     }
 
     const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);

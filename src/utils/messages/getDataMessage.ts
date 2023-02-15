@@ -1,9 +1,11 @@
 import { IWebHookText, IWebHookStatus } from "../../interfaces";
+import { MediaType } from '../../interfaces/IWebHookText';
 
 export interface IGetDataMessage {
   phoneId: string;
   from?: string;
   text?: string;
+  mediaData?: MediaType;
   status?: 'read' | 'sent' | 'delivered';
   messageId?: string;
   name?: string;
@@ -59,19 +61,42 @@ const validateMessage = (entry: IWebHookText.Entry) => {
     if( entry.changes[0].value?.messages?.length ){
       const messageData = entry.changes[0].value;
       const phoneId = messageData.metadata.phone_number_id;
+      const type = messageData.messages[0].type;
       const from = messageData.messages[0].from;
-      const text = messageData.messages[0].text.body;
       const messageId = messageData.messages[0].id;  
       const name = messageData.contacts[0].profile.name;
       const waId = messageData.contacts[0].wa_id;
+      let text = undefined;
+      let mediaData: MediaType | undefined = undefined;
+      if(type === 'text'){
+        text = messageData.messages[0].text!.body;
+      }else if(type === 'document'){
+        const documentData = messageData.messages[0].document!;
+        mediaData = {
+          filename: documentData.filename,
+          mime_type: documentData.mime_type,
+          sha256: documentData.sha256,
+          id: documentData.id,
+          caption: documentData.caption,
+        }
+      } else if(type === 'image'){
+        const imageData = messageData.messages[0].image!;
+        mediaData = {
+          id: imageData.id,
+          mime_type: imageData.mime_type,
+          sha256: imageData.sha256,
+          caption: imageData.caption,
+        }
+      }
 
       const botMessage: IGetDataMessage = {
         phoneId,
         from,
         text,
+        mediaData,
         messageId,
         name,
-        waId
+        waId,
       };
 
       return botMessage;

@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -21,6 +21,7 @@ model Conversacion {
   Empresas  Empresas          @relation("ConversacionesToEmpresas", fields: [empresaId], references: [id])
   mensajes  Mensaje[]
 
+  @@index([empresaId], map: "Conversaciones_empresaId_fkey")
   @@map("Conversaciones")
 }
 
@@ -48,6 +49,8 @@ model Mensaje {
   predecesor            Mensaje?     @relation("MessageSubMessage", fields: [predecesorId], references: [id])
   successor             Mensaje[]    @relation("MessageSubMessage")
 
+  @@index([conversacionId], map: "Mensajes_conversacionId_fkey")
+  @@index([predecesorId], map: "Mensajes_predecesorId_fkey")
   @@map("Mensajes")
 }
 
@@ -74,6 +77,9 @@ model Usuario {
   RolesDefault      RolesDefault?       @relation("RolesDefaultToUsuarios", fields: [roleDefaultId], references: [id])
   Roles             Roles?              @relation("RolesToUsuarios", fields: [roleId], references: [id])
 
+  @@index([empresaId], map: "Usuarios_empresaId_fkey")
+  @@index([roleDefaultId], map: "Usuarios_roleDefaultId_fkey")
+  @@index([roleId], map: "Usuarios_roleId_fkey")
   @@map("Usuarios")
 }
 
@@ -81,7 +87,7 @@ model App {
   id                Int      @id @default(autoincrement())
   nombre            String   @db.VarChar(50)
   appId             String?
-  token             String?
+  token             String?  @db.Text
   businessAccountId String?
   phoneNumberId     String?
   webHookApi        String?  @unique
@@ -94,6 +100,7 @@ model App {
   updatedAt         DateTime @updatedAt
   Empresas          Empresas @relation("AppsToEmpresas", fields: [empresaId], references: [id])
 
+  @@index([empresaId], map: "Apps_empresaId_fkey")
   @@map("Apps")
 }
 
@@ -127,6 +134,10 @@ model Cliente {
   Paises          Paises?       @relation(fields: [paisId], references: [id])
   ultimoMensaje   Mensaje?      @relation(fields: [ultimoMensajeId], references: [id])
 
+  @@index([conversacionId], map: "Clientes_conversacionId_fkey")
+  @@index([empresaId], map: "Clientes_empresaId_fkey")
+  @@index([paisId], map: "Clientes_paisId_fkey")
+  @@index([ultimoMensajeId], map: "Clientes_ultimoMensajeId_fkey")
   @@map("Clientes")
 }
 
@@ -157,6 +168,7 @@ model RegistroCarga {
   DetallesCargas DetallesCargas[] @relation("DetallesCargasToRegistrosCargas")
   Empresas       Empresas         @relation("EmpresasToRegistrosCargas", fields: [empresaId], references: [id])
 
+  @@index([empresaId], map: "RegistrosCargas_empresaId_fkey")
   @@map("RegistrosCargas")
 }
 
@@ -174,6 +186,7 @@ model RegistroMensaje {
   CampaignDetails CampaignDetails[] @relation("CampaignDetailsToRegistrosMensajes")
   Empresas        Empresas          @relation("EmpresasToRegistrosMensajes", fields: [empresaId], references: [id])
 
+  @@index([empresaId], map: "RegistrosMensajes_empresaId_fkey")
   @@map("RegistrosMensajes")
 }
 
@@ -189,11 +202,13 @@ model DetallesCargas {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime
   RegistrosCargas RegistroCarga @relation("DetallesCargasToRegistrosCargas", fields: [registroCargaId], references: [id])
+
+  @@index([registroCargaId], map: "DetallesCargas_registroCargaId_fkey")
 }
 
 model CampaignDetails {
   id                BigInt          @id @default(autoincrement())
-  clienteId         Int?
+  clienteId         BigInt?
   nombre            String
   apellido          String
   whatsapp          String
@@ -207,6 +222,8 @@ model CampaignDetails {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime
   RegistroMensaje   RegistroMensaje @relation("CampaignDetailsToRegistrosMensajes", fields: [registroMensajeId], references: [id])
+
+  @@index([registroMensajeId], map: "CampaignDetails_registroMensajeId_fkey")
 }
 
 model Acciones {
@@ -247,6 +264,8 @@ model Roles {
   Empresas  Empresas   @relation(fields: [empresaId], references: [id])
   Usuario   Usuario[]  @relation("RolesToUsuarios")
   Acciones  Acciones[] @relation("AccionToRol")
+
+  @@index([empresaId], map: "Roles_empresaId_fkey")
 }
 
 model RolesDefault {
@@ -274,6 +293,10 @@ model ChatHistory {
   Usuario   Usuario?   @relation(fields: [asesorId], references: [id])
   Cliente   Cliente    @relation(fields: [clienteId], references: [id])
   Empresas  Empresas   @relation(fields: [empresaId], references: [id])
+
+  @@index([asesorId], map: "ChatHistory_asesorId_fkey")
+  @@index([clienteId], map: "ChatHistory_clienteId_fkey")
+  @@index([empresaId], map: "ChatHistory_empresaId_fkey")
 }
 
 model Paises {
@@ -312,6 +335,8 @@ model RespuestasRapidas {
   createdAt DateTime @default(now())
   updatedAt DateTime
   Usuarios  Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId], map: "RespuestasRapidas_usuarioId_fkey")
 }
 
 model GeneralMessages {
