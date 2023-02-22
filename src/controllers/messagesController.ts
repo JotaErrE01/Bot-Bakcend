@@ -33,7 +33,7 @@ export const messagesController = async (req: Request, res: Response) => {
   try {
     const io: SocketServer<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any> = (req as any).io;
     const { webHookApi } = req.params;
-    const { app, campaignDetails, usuario } = prisma;
+    const { app, campaignDetails } = prisma;
 
     if (!webHookApi) return res.status(200).json({ msg: 'WebHookApi no encontrado' });
 
@@ -183,7 +183,7 @@ export const messagesController = async (req: Request, res: Response) => {
       });
     }
 
-    if (client.isChating) return agentLogic(client, aplication, io, res, text, mediaData);
+    if (client.isChating) return agentLogic(client, aplication, io, res, { phoneId, from, text, messageId, name, waId, mediaData });
 
     if (client.ultimoMensajeId && text) {
       const result = await validCodes(client, text, botMessageData, metaApi, phoneId, !client.ultimoMensajeId);
@@ -238,19 +238,19 @@ export const messagesController = async (req: Request, res: Response) => {
         return res.status(200).json({ msg: 'Message Sent' });
       }
 
-
       // verfica si es un mensaje que conecta con otro Bot
       if (msg.botIdConexion)
         return await connectToOtherBot(msg, client, metaApi, botMessageData, phoneId, res);
 
       // TODO: ver que hacer si no encuentra ningun mensaje hijo
       // res.end();
+      
+      // Verificar si el bot es un bot de encuesta
     }
-
-    // Verificar si el bot es un bot de encuesta
+    
     if (msg?.conversaciones.categoria === 'POLL' && text) {
       const result = await savePollResults(text, client);
-      if (!result) return res.status(200).json({ msg: 'Error en encuestas' });
+      if (!result) return res.status(400).json({ msg: 'Error en encuestas' });
     }
 
     // Actualizar ultimo mensaje del cliente
@@ -267,7 +267,7 @@ export const messagesController = async (req: Request, res: Response) => {
 
     if (msg?.mensajeAsesor) {
       await metaApi.post(`/${phoneId}/messages`, botMessageData);
-      return agentLogic(client, aplication, io, res, text, mediaData);
+      return agentLogic(client, aplication, io, res, { phoneId, from, text, messageId, name, waId, mediaData });
     }
 
     const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);

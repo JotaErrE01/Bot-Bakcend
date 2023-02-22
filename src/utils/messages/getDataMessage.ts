@@ -70,15 +70,6 @@ const validateMessage = (entry: IWebHookText.Entry) => {
       let mediaData: MediaType | undefined = undefined;
       if(type === 'text'){
         text = messageData.messages[0].text!.body;
-      }else if(type === 'document'){
-        const documentData = messageData.messages[0].document!;
-        mediaData = {
-          filename: documentData.filename,
-          mime_type: documentData.mime_type,
-          sha256: documentData.sha256,
-          id: documentData.id,
-          caption: documentData.caption,
-        }
       } else if(type === 'image'){
         const imageData = messageData.messages[0].image!;
         mediaData = {
@@ -86,6 +77,32 @@ const validateMessage = (entry: IWebHookText.Entry) => {
           mime_type: imageData.mime_type,
           sha256: imageData.sha256,
           caption: imageData.caption,
+        }
+      }else if(type === 'video'){
+        const videoData = messageData.messages[0].video!;
+        mediaData = {
+          id: videoData.id,
+          mime_type: videoData.mime_type,
+          sha256: videoData.sha256,
+          caption: videoData.caption,
+        }
+      } else if(type === 'audio'){
+        const audioData = messageData.messages[0].audio!;
+        mediaData = {
+          id: audioData.id,
+          mime_type: audioData.mime_type,
+          sha256: audioData.sha256,
+          caption: audioData.caption,
+          voice: audioData.voice,
+        }
+      }else{
+        const documentData = messageData.messages[0].document!;
+        mediaData = {
+          filename: documentData.filename,
+          mime_type: documentData.mime_type,
+          sha256: documentData.sha256,
+          id: documentData.id,
+          caption: documentData.caption,
         }
       }
 

@@ -44,6 +44,7 @@ model Mensaje {
   isDeleted             Boolean?     @default(false)
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
+  respuestaEncuesta     String?      @db.VarChar(1000)
   cliente               Cliente[]
   conversaciones        Conversacion @relation(fields: [conversacionId], references: [id])
   predecesor            Mensaje?     @relation("MessageSubMessage", fields: [predecesorId], references: [id])
@@ -340,21 +341,23 @@ model RespuestasRapidas {
 }
 
 model GeneralMessages {
-  id                Int        @id @default(autoincrement())
-  messageID         String?    @unique
+  id                String                      @id @default(uuid())
+  messageID         String?                     @unique
   empresaId         String
   appID             Int
-  origen            Origin
-  idOrigen          Int
-  mensaje           String
+  origen            GeneralMessages_origen
+  idOrigen          BigInt
+  mensaje           String?
   media             String?
   mediaType         MediaType?
   recipientWhatsapp String?
-  recipientId       String
+  recipientId       BigInt?
   status            String
-  createdAt         DateTime   @default(now())
+  createdAt         DateTime                    @default(now())
   updatedAt         DateTime
-  isDeleted         Boolean?   @default(false)
+  isDeleted         Boolean?                    @default(false)
+  header            String?
+  headerType        GeneralMessages_headerType?
 }
 
 enum MediaType {
@@ -416,10 +419,17 @@ enum ConversationType {
   DEFAULT
 }
 
-enum Origin {
+enum GeneralMessages_origen {
   CLIENTE
-  ASESOR
+  AGENTE
   PLANTILLA
   CAMPAIGN
   BOT
+}
+
+enum GeneralMessages_headerType {
+  TEXT
+  IMAGE
+  VIDEO
+  DOCUMENT
 }

@@ -36,7 +36,9 @@ export interface Message {
   text?:      Text;
   document?:  MediaType;
   image?:     MediaType;
-  type:      string;
+  video?:     MediaType;
+  audio?:     MediaType;
+  type:      'text' | 'document' | 'image' | 'video' | 'audio';
 }
 
 export interface Text {
@@ -57,6 +59,7 @@ export interface MediaType {
   sha256:    string;
   id:        string;
   caption?:  string;
+  voice?:    boolean;
 }
 
 // export interface IImageType {

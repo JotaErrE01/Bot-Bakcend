@@ -4,10 +4,10 @@ import { prisma } from '../db/config';
 import { Response } from 'express';
 import { serializeBigInt } from './serializedBigInt';
 import { MetaApi } from '../api';
-import { MediaType } from '../interfaces/IWebHookText';
+import { Messages } from '.';
 
-export const agentLogic = async (client: Cliente, aplication: App, io: SocketServer, res: Response, text?: string, mediaData?: MediaType | undefined) => {
-  const { usuario, cliente, chatHistory, rolesDefault, roles } = prisma;
+export const agentLogic = async (client: Cliente, aplication: App, io: SocketServer, res: Response, dataMsg: Messages.IGetDataMessage) => {
+  const { usuario, cliente, chatHistory, rolesDefault, roles, generalMessages, empresas } = prisma;
 
   try {
     // actualizamos el cliente de la base de datos
@@ -23,12 +23,20 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
       });
     }
 
+    const empresa = await empresas.findUnique({
+      where: {
+        id: aplication.empresaId
+      },
+    });
+
+    if(empresa?.isDeleted)  return res.status(404).json({ msg: 'Empresa no encontrada' });
+
     let mediaChatObj: { media?: string, mediaType?: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT' } = {};
-    if (mediaData) {
+    if (dataMsg.mediaData) {
       const metaApi = MetaApi.createApi(aplication.token!);
-      const { data } = await metaApi.get(`${mediaData.id}`);
+      const { data } = await metaApi.get(`${dataMsg.mediaData.id}`);
       mediaChatObj = {
-        media: data.url,
+        media: dataMsg.mediaData.id,
       }
       if (data.mime_type.includes('image')) {
         Object.assign(mediaChatObj, { mediaType: 'IMAGE' });
@@ -43,14 +51,30 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
 
     if (client.chatAsesorId) {
       const chat = {
-        mensaje: text,
+        mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
         clienteId: client.id,
         asesorId: client.chatAsesorId,
         isClient: true,
         empresaId: aplication.empresaId,
         ...mediaChatObj
       }
-      // console.log({chat})
+
+      await generalMessages.create({
+        data: {
+          mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
+          messageID: dataMsg.messageId,
+          appID: aplication.id,
+          empresaId: aplication.empresaId,
+          idOrigen: client.id,
+          recipientId: client.chatAsesorId,
+          status: 'ENVIADO',
+          recipientWhatsapp: empresa?.whatsapp,
+          origen: 'CLIENTE',
+          isDeleted: false,
+          updatedAt: new Date(),
+        }
+      });
+      
       io.to(client.chatAsesorId.toString()).emit('personal-message', serializeBigInt(chat));
     } else {
       const empresaId = aplication.empresaId.toString();
@@ -121,8 +145,24 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           }
         });
 
+        await generalMessages.create({
+          data: {
+            mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
+            messageID: dataMsg.messageId,
+            appID: aplication.id,
+            empresaId: aplication.empresaId,
+            idOrigen: client.id,
+            recipientId: asesor.id,
+            status: 'ENVIADO',
+            recipientWhatsapp: empresa?.whatsapp,
+            origen: 'CLIENTE',
+            isDeleted: false,
+            updatedAt: new Date(),
+          }
+        });
+
         const chat = {
-          mensaje: text,
+          mensaje: dataMsg.text,
           clienteId: client.id,
           asesorId: asesor.id,
           isClient: true,
@@ -134,9 +174,25 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
         return res.status(200).json({ msg: 'Mensaje enviado personal-message' });
       }
 
+      await generalMessages.create({
+        data: {
+          mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
+          messageID: dataMsg.messageId,
+          appID: aplication.id,
+          empresaId: aplication.empresaId,
+          idOrigen: client.id,
+          recipientId: null,
+          status: 'ENVIADO',
+          recipientWhatsapp: empresa?.whatsapp,
+          origen: 'CLIENTE',
+          isDeleted: false,
+          updatedAt: new Date(),
+        }
+      });
+
       const chat = await chatHistory.create({
         data: {
-          mensaje: text,
+          mensaje: dataMsg.text,
           clienteId: BigInt(Number(client.id)),
           isClient: true,
           asesorId: null,
