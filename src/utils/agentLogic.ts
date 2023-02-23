@@ -49,7 +49,7 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
       }
     }
 
-    if (client.chatAsesorId) {
+    if (client.chatAsesorId) {      
       const chat = {
         mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
         clienteId: client.id,

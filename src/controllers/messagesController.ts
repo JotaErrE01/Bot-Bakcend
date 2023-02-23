@@ -182,7 +182,7 @@ export const messagesController = async (req: Request, res: Response) => {
         }
       });
     }
-
+    
     if (client.isChating) return agentLogic(client, aplication, io, res, { phoneId, from, text, messageId, name, waId, mediaData });
 
     if (client.ultimoMensajeId && text) {
@@ -266,6 +266,8 @@ export const messagesController = async (req: Request, res: Response) => {
     botMessageData.text.body = formatVariables((msg?.cuerpo as string), client)!;
 
     if (msg?.mensajeAsesor) {
+      console.log('asjds;fjd;afldsj;s');
+      
       await metaApi.post(`/${phoneId}/messages`, botMessageData);
       return agentLogic(client, aplication, io, res, { phoneId, from, text, messageId, name, waId, mediaData });
     }
