@@ -1,8 +1,9 @@
 import { AxiosInstance } from "axios";
-import { Mensaje } from '@prisma/client';
-import FormData from "form-data";
+import { App, Cliente, Mensaje } from '@prisma/client';
+import { prisma } from '../db/config';
+import { Messages } from '.';
 
-export const sendMedia = async (msg: Mensaje | null, phoneId: string, metaApi: AxiosInstance, from: string): Promise<Boolean> => {
+export const sendMedia = async (msg: Mensaje | null, phoneId: string, metaApi: AxiosInstance, from: string, aplication: App, client:  Cliente, dataMsg: Messages.IGetDataMessage): Promise<Boolean> => {
   let mediaObj = {
     "messaging_product": "whatsapp",
     "recipient_type": "individual",
@@ -14,26 +15,6 @@ export const sendMedia = async (msg: Mensaje | null, phoneId: string, metaApi: A
     //TODO: Change this to a real image
     // Object.assign(mediaObj, { image: { link: `${process.env.ADMIN_BOT_HOST}/api/static?id=${msg.id}` } });
     Object.assign(mediaObj, { image: { link: 'https://wallpapercave.com/wp/wp4923991.png', caption: msg?.cuerpo } });
-
-    // FROM META MEDIAID
-    // const file = await fetch(`${process.env.ADMIN_BOT_HOST}/api/static?id=${msg.id}`).then(res => res.blob());
-
-    // const file = await axios.get(`${process.env.ADMIN_BOT_HOST}/api/static?id=${msg.id}`, { responseType: 'blob' });
-
-    // transform the blob into a buffer
-    // const buffer = Buffer.from(file.data, 'binary');
-
-    // transform application/octet-stream into image/jpeg
-    // const imageType = file.headers['content-type'];
-    // const formData = new FormData();
-    // formData.append('file', buffer, msg.id.toString());
-    // formData.append('filetype', imageType);
-    // formData.append('type', 'image/png');
-    // formData.append('messaging_product', 'whatsapp');
-    // const { data } = await metaApi.post(`/${phoneId}/media`, formData);
-    // console.log('🌌🌌🌌🌌🌌🌌🌌🌌');
-    // console.log({data});
-    
   }
 
   if (msg?.mediaType === 'DOCUMENT') {
@@ -47,7 +28,53 @@ export const sendMedia = async (msg: Mensaje | null, phoneId: string, metaApi: A
   }
 
   try {
-    await metaApi.post(`/${phoneId}/messages`, mediaObj);
+    
+    const { generalMessages, conversacion } = prisma;
+    const conversation = await conversacion.findUnique({
+      where: {
+        id: msg?.conversacionId
+      },
+      include: {
+        Empresas: true,
+      }
+    });
+
+    await generalMessages.create({
+      data: {
+        appID: aplication.id,
+        empresaId: aplication.empresaId,
+        idOrigen: client.id,
+        origen: 'CLIENTE',
+        mensaje: dataMsg.text || null,
+        status: 'ENVIADO',
+        updatedAt: new Date(),
+        createdAt: new Date(),
+        recipientId: client.chatAsesorId,
+        recipientWhatsapp: conversation?.Empresas.whatsapp,
+        messageID: dataMsg.messageId,
+      }
+    });
+
+    
+    const { data } = await metaApi.post(`/${phoneId}/messages`, mediaObj);
+    const messageID = data.messages[0].id;
+
+    await generalMessages.create({
+      data: {
+        mensaje: msg?.cuerpo || null,
+        origen: 'BOT',
+        messageID,
+        appID: aplication.id,
+        empresaId: conversation!.Empresas.id,
+        idOrigen: msg!.id,
+        recipientId:  client.id,
+        status: 'ENVIADO',
+        recipientWhatsapp: dataMsg.from,
+        updatedAt: new Date(),
+        media: msg?.fileName,
+        mediaType: msg?.mediaType,
+      }
+    });
     return true;
   } catch (error) {
     console.log(error);

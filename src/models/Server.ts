@@ -39,17 +39,6 @@ class Server {
   }
 
   routes() {
-    // this.app.put('/api/socket', (req, res) => {
-    //   // emitir un evento
-    //   // this.io.send('hola', req.body.message);
-    //   this.io.emit('message', 'hola 2');
-
-    //   return res.status(200).json({
-    //     ok: true,
-    //     message: 'Todo está bien',
-    //   });
-    // });
-
     this.app.use('/api', (req, res, next) => {
       Object.assign(req, { io: this.io });
       webHookRouter(req, res, next);

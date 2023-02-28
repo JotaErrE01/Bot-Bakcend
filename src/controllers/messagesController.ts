@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { application, Request, Response } from "express";
 import { Server as SocketServer } from 'socket.io';
 import { DefaultEventsMap } from "socket.io/dist/typed-events";
 import axios from 'axios';
@@ -43,7 +43,7 @@ export const messagesController = async (req: Request, res: Response) => {
       }
     });
 
-    if (!aplication) return res.status(200).json({ msg: 'Bad Request' });
+    if (!aplication) return res.status(400).json({ msg: 'Bad Request' });
 
     const reqType = getReqType(req.body);
     if (reqType === 'template') {
@@ -53,7 +53,7 @@ export const messagesController = async (req: Request, res: Response) => {
     }
 
     const dataMessage = await Messages.getDataMessage(req.body);
-    if (!dataMessage) return res.status(200).json({ msg: 'No hay mensajes' });
+    if (!dataMessage) return res.status(400).json({ msg: 'No hay dataMessage' });
 
     if (dataMessage.status) {
       const registroMessage = await campaignDetails.findUnique({
@@ -61,7 +61,7 @@ export const messagesController = async (req: Request, res: Response) => {
           whatsappMessageId: dataMessage.messageId,
         }
       });
-      if (!registroMessage) return res.status(200).json({ msg: 'No hay mensajes' });
+      if (!registroMessage) return res.status(200).json({ msg: 'No hay registro Mensajes detalles' });
       if (registroMessage.leido) return res.status(200).json({ msg: 'Mensaje ya leido' });
       switch (dataMessage.status) {
         case 'delivered':
@@ -95,11 +95,11 @@ export const messagesController = async (req: Request, res: Response) => {
 
     const { phoneId, from, text, messageId, name, waId, mediaData } = dataMessage;
     if (!phoneId || !from || !messageId || !name) {
-      return res.status(200).json({ msg: 'No hay mensajes' });
+      return res.status(400).json({ msg: 'No hay data mensajes' });
     }
 
     // create prisma instance
-    const { cliente, mensaje, mensajeLog, conversacion } = prisma;
+    const { cliente, mensaje, mensajeLog, conversacion, generalMessages } = prisma;
 
     // CONTROLAR QUE META NO ENVIE EL MISMO MENSAJE
     const message = await mensajeLog.findUnique({
@@ -118,6 +118,7 @@ export const messagesController = async (req: Request, res: Response) => {
       }
     });
 
+    // Inicializar metaApi
     const metaApi = MetaApi.createApi(aplication.token!);
 
     const botMessageData = {
@@ -182,7 +183,7 @@ export const messagesController = async (req: Request, res: Response) => {
         }
       });
     }
-    
+
     if (client.isChating) return agentLogic(client, aplication, io, res, { phoneId, from, text, messageId, name, waId, mediaData });
 
     if (client.ultimoMensajeId && text) {
@@ -203,12 +204,38 @@ export const messagesController = async (req: Request, res: Response) => {
 
         // si anyword es falso y no hay palabras clave, enviar el mensaje alternativo o el mensaje de no entiendo
         if (!palabraClave) {
+          await generalMessages.create({
+            data: {
+              appID: aplication.id,
+              empresaId: aplication.empresaId,
+              idOrigen: client.id,
+              origen: 'CLIENTE',
+              mensaje: text,
+              status: 'ENVIADO',
+              updatedAt: new Date(),
+              createdAt: new Date(),
+              messageID: messageId,
+            }
+          });
           botMessageData.text.body = msg?.altMessage || 'Perdon, no entiendo tu mensaje 😢';
-          await metaApi.post(`/${phoneId}/messages`, botMessageData);
+          const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);
+          await generalMessages.create({
+            data: {
+              appID: aplication.id,
+              empresaId: aplication.empresaId,
+              idOrigen: (msg as any).id,
+              origen: 'BOT',
+              mensaje: botMessageData.text.body,
+              status: 'ENVIADO',
+              updatedAt: new Date(),
+              createdAt: new Date(),
+              messageID: data.messages[0].id,
+            }
+          });
           return res.status(200).json({ msg: 'Message Sent' });
         }
       }
-    } else if(text) {
+    } else if (text) {
       // Encuentra todos los hijos del ultimo mensaje
       const msgs = await mensaje.findMany({
         where: { conversacionId: client.conversacionId!, predecesorId: client.ultimoMensajeId, isDeleted: false },
@@ -230,24 +257,50 @@ export const messagesController = async (req: Request, res: Response) => {
         const mensajeNoEntendi = await mensaje.findUnique({
           where: { id: client.ultimoMensajeId || undefined },
         });
-
+        
         // manejando las variables en el mensaje alternativo
         botMessageData.text.body = formatVariables(mensajeNoEntendi?.altMessage, client) || 'Perdon, no entiendo tu mensaje 😢';
+        await generalMessages.create({
+          data: {
+            appID: aplication.id,
+            empresaId: aplication.empresaId,
+            idOrigen: client.id,
+            origen: 'CLIENTE',
+            mensaje: text,
+            status: 'ENVIADO',
+            updatedAt: new Date(),
+            createdAt: new Date(),
+            messageID: messageId,
+          }
+        });
+        const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);        
 
-        await metaApi.post(`/${phoneId}/messages`, botMessageData);
+        await generalMessages.create({
+          data: {
+            appID: aplication.id,
+            empresaId: aplication.empresaId,
+            idOrigen: mensajeNoEntendi!.id,
+            origen: 'BOT',
+            mensaje: botMessageData.text.body,
+            status: 'ENVIADO',
+            updatedAt: new Date(),
+            createdAt: new Date(),
+            messageID: data.messages[0].id,
+            recipientId: client.id,
+            recipientWhatsapp: client.whatsapp,
+          }
+        });
         return res.status(200).json({ msg: 'Message Sent' });
       }
 
       // verfica si es un mensaje que conecta con otro Bot
       if (msg.botIdConexion)
-        return await connectToOtherBot(msg, client, metaApi, botMessageData, phoneId, res);
+        return await connectToOtherBot(msg, client, metaApi, botMessageData, phoneId, res, aplication, { phoneId, from, text, messageId, name, waId, mediaData });
 
       // TODO: ver que hacer si no encuentra ningun mensaje hijo
       // res.end();
-      
-      // Verificar si el bot es un bot de encuesta
     }
-    
+
     if (msg?.conversaciones.categoria === 'POLL' && text) {
       const result = await savePollResults(text, client);
       if (!result) return res.status(400).json({ msg: 'Error en encuestas' });
@@ -257,8 +310,8 @@ export const messagesController = async (req: Request, res: Response) => {
     await cliente.update({ where: { id: client.id }, data: { ultimoMensajeId: msg?.id } });
 
     // enviar media si existe en el mensaje
-    if(msg?.mediaType) {
-      const result = await sendMedia(msg, phoneId, metaApi, from);
+    if (msg?.mediaType) {
+      const result = await sendMedia(msg, phoneId, metaApi, from, aplication, client, { phoneId, from, text, messageId, name, waId, mediaData });
       if (!result) return res.status(400).json({ msg: 'Error sending media' });
       return res.status(200).json({ msg: 'Message Sent' });
     }
@@ -266,13 +319,56 @@ export const messagesController = async (req: Request, res: Response) => {
     botMessageData.text.body = formatVariables((msg?.cuerpo as string), client)!;
 
     if (msg?.mensajeAsesor) {
-      console.log('asjds;fjd;afldsj;s');
-      
-      await metaApi.post(`/${phoneId}/messages`, botMessageData);
+      const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);
+
+      await generalMessages.create({
+        data: {
+          appID: aplication.id,
+          empresaId: aplication.empresaId,
+          idOrigen: (msg as any).id,
+          origen: 'BOT',
+          mensaje: botMessageData.text.body,
+          status: 'ENVIADO',
+          updatedAt: new Date(),
+          createdAt: new Date(),
+          messageID: data.messages[0].id,
+        }
+      });
+
       return agentLogic(client, aplication, io, res, { phoneId, from, text, messageId, name, waId, mediaData });
     }
 
+    await generalMessages.create({
+      data: {
+        appID: aplication.id,
+        empresaId: aplication.empresaId,
+        idOrigen: client.id,
+        origen: 'CLIENTE',
+        mensaje: text,
+        status: 'ENVIADO',
+        updatedAt: new Date(),
+        createdAt: new Date(),
+        messageID: messageId,
+      }
+    });
+
     const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);
+
+    await generalMessages.create({
+      data: {
+        appID: aplication.id,
+        empresaId: aplication.empresaId,
+        idOrigen: (msg as any).id,
+        origen: 'BOT',
+        mensaje: botMessageData.text.body,
+        status: 'ENVIADO',
+        updatedAt: new Date(),
+        createdAt: new Date(),
+        messageID: data.messages[0].id,
+        recipientId: client.id,
+        recipientWhatsapp: client.whatsapp,
+      }
+    });
 
     return res.status(200).json(data);
   } catch (error) {

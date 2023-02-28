@@ -45,6 +45,7 @@ model Mensaje {
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
   respuestaEncuesta     String?      @db.VarChar(1000)
+  anyResponse           Boolean?     @default(false)
   cliente               Cliente[]
   conversaciones        Conversacion @relation(fields: [conversacionId], references: [id])
   predecesor            Mensaje?     @relation("MessageSubMessage", fields: [predecesorId], references: [id])
@@ -72,8 +73,10 @@ model Usuario {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   empresaId         String
+  departamentoId    Int?
   ChatHistory       ChatHistory[]
   RespuestasRapidas RespuestasRapidas[]
+  Departamentos     Departamentos?      @relation(fields: [departamentoId], references: [id])
   Empresas          Empresas            @relation("EmpresasToUsuarios", fields: [empresaId], references: [id])
   RolesDefault      RolesDefault?       @relation("RolesDefaultToUsuarios", fields: [roleDefaultId], references: [id])
   Roles             Roles?              @relation("RolesToUsuarios", fields: [roleId], references: [id])
@@ -81,6 +84,7 @@ model Usuario {
   @@index([empresaId], map: "Usuarios_empresaId_fkey")
   @@index([roleDefaultId], map: "Usuarios_roleDefaultId_fkey")
   @@index([roleId], map: "Usuarios_roleId_fkey")
+  @@index([departamentoId], map: "Usuarios_departamentoId_fkey")
   @@map("Usuarios")
 }
 
@@ -249,6 +253,7 @@ model Empresas {
   ChatHistory     ChatHistory[]
   Cliente         Cliente[]         @relation("ClientesToEmpresas")
   Conversacion    Conversacion[]    @relation("ConversacionesToEmpresas")
+  Departamentos   Departamentos[]
   RegistroCarga   RegistroCarga[]   @relation("EmpresasToRegistrosCargas")
   RegistroMensaje RegistroMensaje[] @relation("EmpresasToRegistrosMensajes")
   Roles           Roles[]
@@ -291,6 +296,7 @@ model ChatHistory {
   isDeleted Boolean?   @default(false)
   createdAt DateTime   @default(now())
   updatedAt DateTime
+  mimeType  String?
   Usuario   Usuario?   @relation(fields: [asesorId], references: [id])
   Cliente   Cliente    @relation(fields: [clienteId], references: [id])
   Empresas  Empresas   @relation(fields: [empresaId], references: [id])
@@ -358,6 +364,19 @@ model GeneralMessages {
   isDeleted         Boolean?                    @default(false)
   header            String?
   headerType        GeneralMessages_headerType?
+}
+
+model Departamentos {
+  id        Int       @id @default(autoincrement())
+  nombre    String    @db.VarChar(100)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime
+  empresaId String
+  isDeleted Boolean?  @default(false)
+  Empresas  Empresas  @relation(fields: [empresaId], references: [id])
+  Usuarios  Usuario[]
+
+  @@index([empresaId], map: "Departamentos_empresaId_fkey")
 }
 
 enum MediaType {

@@ -75,7 +75,7 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
         }
       });
       
-      io.to(client.chatAsesorId.toString()).emit('personal-message', serializeBigInt(chat));
+      io.to(client.chatAsesorId.toString()).emit('personal-message', serializeBigInt(chat)); //!
     } else {
       const empresaId = aplication.empresaId.toString();
 
@@ -121,7 +121,7 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           const hasPermission = role?.Acciones.find((action) => action.nombre === 'CHAT_PERMISSION');
 
           if (!hasPermission) {
-            return res.status(200).json({ msg: 'El agente no tiene permiso para chatear' });
+            return res.status(403).json({ msg: 'El agente no tiene permiso para chatear' });
           }
         }
 
@@ -170,6 +170,13 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           ...mediaChatObj
         }
 
+        // await chatHistory.create({
+        //   data: {
+        //     mensaje: dataMsg.text,
+        //     clienteId: BigInt(Number(client.id)),
+        //   }
+        // })
+
         io.to(asesor.id.toString()).emit('personal-message', serializeBigInt(chat));
         return res.status(200).json({ msg: 'Mensaje enviado personal-message' });
       }
@@ -206,7 +213,7 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           Cliente: true,
         }
       });
-      io.to(empresaId).emit('enterprise-message', serializeBigInt(chat));
+      io.to(empresaId).emit('enterprise-message', serializeBigInt(chat)); //!
     }
 
     return res.status(200).json({ msg: 'Mensaje enviado personal-message/enterprise' });
