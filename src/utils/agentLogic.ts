@@ -1,13 +1,24 @@
-import { Usuario, Cliente, App } from '@prisma/client';
+import { Usuario, Cliente, App, ChatHistory } from '@prisma/client';
 import { Server as SocketServer } from 'socket.io';
+import cron from 'node-cron';
 import { prisma } from '../db/config';
 import { Response } from 'express';
 import { serializeBigInt } from './serializedBigInt';
 import { MetaApi } from '../api';
 import { Messages } from '.';
-
+// let timing: NodeJS.Timeout;
+// let coutner = 0;
 export const agentLogic = async (client: Cliente, aplication: App, io: SocketServer, res: Response, dataMsg: Messages.IGetDataMessage) => {
   const { usuario, cliente, chatHistory, rolesDefault, roles, generalMessages, empresas } = prisma;
+  // timing && clearTimeout(timing);
+  // timing = setTimeout(() => {
+  //   console.log('======================');
+  //   console.log('SET TIME OUT EXECUTING');
+  //   console.log('======================');
+  // }, 10000);
+  // console.log({timing});
+  
+  // timing.refresh();
 
   try {
     // actualizamos el cliente de la base de datos
@@ -29,7 +40,7 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
       },
     });
 
-    if(empresa?.isDeleted)  return res.status(404).json({ msg: 'Empresa no encontrada' });
+    if (empresa?.isDeleted) return res.status(404).json({ msg: 'Empresa no encontrada' });
 
     let mediaChatObj: { media?: string, mediaType?: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT' } = {};
     if (dataMsg.mediaData) {
@@ -49,15 +60,21 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
       }
     }
 
-    if (client.chatAsesorId) {      
-      const chat = {
-        mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
-        clienteId: client.id,
-        asesorId: client.chatAsesorId,
-        isClient: true,
-        empresaId: aplication.empresaId,
-        ...mediaChatObj
-      }
+    if (client.chatAsesorId) {
+      const chat = await chatHistory.create({
+        data: {
+          mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
+          clienteId: client.id,
+          asesorId: client.chatAsesorId,
+          isClient: true,
+          empresaId: aplication.empresaId,
+          ...mediaChatObj,
+          updatedAt: new Date(),
+        },
+        include: {
+          Cliente: true,
+        }
+      });
 
       await generalMessages.create({
         data: {
@@ -74,7 +91,9 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           updatedAt: new Date(),
         }
       });
-      
+
+      setClientTiming(aplication, dataMsg, chat);
+
       io.to(client.chatAsesorId.toString()).emit('personal-message', serializeBigInt(chat)); //!
     } else {
       const empresaId = aplication.empresaId.toString();
@@ -89,6 +108,8 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
         ORDER BY u.quantityChats ASC LIMIT 1;
       `;
 
+
+      // Asignar el cliente con el agente con menos chats
       if (asesores.length === 1) {
         const asesor = asesores[0];
 
@@ -131,7 +152,7 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           },
           data: {
             quantityChats: {
-              increment: 1,
+              increment: 1, // incrementamos la cantidad de chats del agente
             }
           }
         });
@@ -141,7 +162,7 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
             id: client.id,
           },
           data: {
-            chatAsesorId: BigInt(Number(asesor.id)),
+            chatAsesorId: BigInt(Number(asesor.id)), // asignamos el agente al cliente
           }
         });
 
@@ -161,14 +182,14 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           }
         });
 
-        const chat = {
-          mensaje: dataMsg.text,
-          clienteId: client.id,
-          asesorId: asesor.id,
-          isClient: true,
-          empresaId: aplication.empresaId,
-          ...mediaChatObj
-        }
+        // const chat = {
+        //   mensaje: dataMsg.text,
+        //   clienteId: client.id,
+        //   asesorId: asesor.id,
+        //   isClient: true,
+        //   empresaId: aplication.empresaId,
+        //   ...mediaChatObj
+        // }
 
         // await chatHistory.create({
         //   data: {
@@ -176,6 +197,24 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
         //     clienteId: BigInt(Number(client.id)),
         //   }
         // })
+
+        const chat = await chatHistory.create({
+          data: {
+            mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
+            clienteId: client.id,
+            asesorId: asesor.id,
+            isClient: true,
+            empresaId: aplication.empresaId,
+            ...mediaChatObj,
+            updatedAt: new Date(),
+          },
+          include: {
+            Cliente: true,
+          }
+        });
+
+        console.log({chat});
+        setClientTiming(aplication, dataMsg, chat);
 
         io.to(asesor.id.toString()).emit('personal-message', serializeBigInt(chat));
         return res.status(200).json({ msg: 'Mensaje enviado personal-message' });
@@ -213,6 +252,8 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           Cliente: true,
         }
       });
+
+      setClientTiming(aplication, dataMsg, chat);
       io.to(empresaId).emit('enterprise-message', serializeBigInt(chat)); //!
     }
 
@@ -223,3 +264,86 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
     return res.status(400).json({ msg: 'Error en el servidor' });
   }
 }
+
+
+// let counter = 0;
+// let interval: NodeJS.Timeout;
+
+const setClientTiming = (aplication: App, dataMsg: Messages.IGetDataMessage, chat: ChatHistory & { Cliente: Cliente; }, timing: number = 1) => {
+  const createdAt = new Date(chat.createdAt);
+  const minutes = timing * 60000;
+  // const stopTime = new Date(createdAt.getTime() + (timing * 1000));
+  const stopTime = new Date(createdAt.getTime() + minutes);
+  const cronString = `${stopTime.getSeconds()} ${stopTime.getMinutes()} ${stopTime.getHours()} ${stopTime.getDate()} ${stopTime.getMonth() + 1} *`;
+
+  const task = cron.getTasks().get(chat.Cliente.id.toString());
+  if(task) task.stop();
+
+  console.log({ createdAt, stopTime, cronString });
+
+  const job = cron.schedule(cronString, async () => {
+    await sendStopMessage(dataMsg, aplication, chat);
+    job.stop();
+  }, {
+    scheduled: true,
+    timezone: 'America/Guayaquil',
+    name: chat.Cliente.id.toString()
+  });
+}
+
+const sendStopMessage = async (dataMsg: Messages.IGetDataMessage, aplication: App, chat: ChatHistory & { Cliente: Cliente; }): Promise<boolean> => {
+  const { cliente, usuario } = prisma;
+  const dataMessage = {
+    "messaging_product": "whatsapp",
+    "to": `${dataMsg.from}`,
+    "type": "text",
+    "text": {
+      body: 'El tiempo de respuesta ha finalizado. Si desea continuar con la conversación, por favor escriba "Hola"',
+    },
+  };
+
+  const metaApi = MetaApi.createApi(aplication.token!);
+
+  try {
+    const client = await cliente.findUnique({
+      where: {
+        id: chat.Cliente.id,
+      },
+    });
+
+    if(!client || client.isDeleted) throw new Error('Cliente no encontrado');
+    if(!client.isChating) throw new Error('El cliente no está chateando');
+
+    await cliente.update({
+      where: {
+        id: chat.Cliente.id,
+      },
+      data: {
+        chatAsesorId: null,
+        ultimoMensajeId: null,
+        conversacionId: null,
+        isChating: false,
+      }
+    });
+
+    if(chat.asesorId) {
+      await usuario.update({
+        where: {
+          id: chat.asesorId,
+        },
+        data: {
+          quantityChats: {
+            decrement: 1,
+          }
+        }
+      });
+    }
+
+    const { data } = await metaApi.post(`/${aplication.phoneNumberId}/messages`, dataMessage);
+    return true; 
+  } catch (error) {
+    console.log(error);
+    return false;
+  }
+}
+

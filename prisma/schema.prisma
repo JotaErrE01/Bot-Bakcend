@@ -31,6 +31,8 @@ model Mensaje {
   anyWord               Boolean      @default(false)
   palabrasClave         String
   cuerpo                String?      @db.VarChar(1000)
+  respuestaEncuesta     String?      @db.VarChar(1000)
+  anyResponse           Boolean?     @default(false)
   mediaType             MediaType?
   fileName              String?
   predecesorId          Int?
@@ -44,8 +46,6 @@ model Mensaje {
   isDeleted             Boolean?     @default(false)
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
-  respuestaEncuesta     String?      @db.VarChar(1000)
-  anyResponse           Boolean?     @default(false)
   cliente               Cliente[]
   conversaciones        Conversacion @relation(fields: [conversacionId], references: [id])
   predecesor            Mensaje?     @relation("MessageSubMessage", fields: [predecesorId], references: [id])
@@ -291,12 +291,12 @@ model ChatHistory {
   mensaje   String?
   media     String?
   mediaType MediaType?
+  mimeType  String?
   isClient  Boolean    @default(false)
   empresaId String
   isDeleted Boolean?   @default(false)
   createdAt DateTime   @default(now())
   updatedAt DateTime
-  mimeType  String?
   Usuario   Usuario?   @relation(fields: [asesorId], references: [id])
   Cliente   Cliente    @relation(fields: [clienteId], references: [id])
   Empresas  Empresas   @relation(fields: [empresaId], references: [id])
@@ -359,22 +359,23 @@ model GeneralMessages {
   recipientWhatsapp String?
   recipientId       BigInt?
   status            String
+  header            String?
+  headerType        GeneralMessages_headerType?
   createdAt         DateTime                    @default(now())
   updatedAt         DateTime
   isDeleted         Boolean?                    @default(false)
-  header            String?
-  headerType        GeneralMessages_headerType?
 }
 
 model Departamentos {
-  id        Int       @id @default(autoincrement())
-  nombre    String    @db.VarChar(100)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime
-  empresaId String
-  isDeleted Boolean?  @default(false)
-  Empresas  Empresas  @relation(fields: [empresaId], references: [id])
-  Usuarios  Usuario[]
+  id             Int       @id @default(autoincrement())
+  nombre         String    @db.VarChar(100)
+  codigoAsociado String    @unique @db.VarChar(100)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime
+  empresaId      String
+  isDeleted      Boolean?  @default(false)
+  Empresas       Empresas  @relation(fields: [empresaId], references: [id])
+  Usuarios       Usuario[]
 
   @@index([empresaId], map: "Departamentos_empresaId_fkey")
 }
