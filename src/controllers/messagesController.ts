@@ -1,4 +1,4 @@
-import { application, Request, Response } from "express";
+import { Request, Response } from "express";
 import { Server as SocketServer } from 'socket.io';
 import { DefaultEventsMap } from "socket.io/dist/typed-events";
 import axios from 'axios';
@@ -6,6 +6,8 @@ import { App, Cliente } from '@prisma/client';
 import { formatVariables, Messages, getReqType, Templates, sendMedia, validCodes, connectToOtherBot, RegisterBot, registerClient, savePollResults, agentLogic } from "../utils";
 import { MetaApi } from "../api";
 import { prisma } from "../db";
+import { chatTimeOut } from '../utils/chatTimeOut';
+import { serializeBigInt } from "../utils/serializedBigInt";
 
 // funcion para validar el token con meta
 export const validarWebHookToken = async (req: Request, res: Response) => {
@@ -40,6 +42,9 @@ export const messagesController = async (req: Request, res: Response) => {
     const aplication = await app.findUnique({
       where: {
         webHookApi: `${process.env.APP_HOST}/${webHookApi}`
+      },
+      include: {
+        Empresas: true,
       }
     });
 
@@ -148,9 +153,23 @@ export const messagesController = async (req: Request, res: Response) => {
 
     let msg;
 
-    if (!client.conversacionId && !client.isChating) {
-      // TODO: CONTESTAR BOT POR DEFECTO
+    const createdMessageData = await generalMessages.create({
+      data: {
+        appID: aplication.id,
+        empresaId: aplication.empresaId,
+        idOrigen: client.id,
+        origen: 'CLIENTE',
+        mensaje: text,
+        status: 'ENVIADO',
+        updatedAt: new Date(),
+        // createdAt: new Date(),
+        messageID: messageId,
+      }
+    });
 
+    chatTimeOut(io, aplication, dataMessage, createdMessageData.createdAt, client, aplication.Empresas.chatTiming);
+
+    if (!client.conversacionId && !client.isChating) {
       const defaultBot = await conversacion.findFirst({
         where: {
           isDeleted: false,
@@ -204,19 +223,19 @@ export const messagesController = async (req: Request, res: Response) => {
 
         // si anyword es falso y no hay palabras clave, enviar el mensaje alternativo o el mensaje de no entiendo
         if (!palabraClave) {
-          await generalMessages.create({
-            data: {
-              appID: aplication.id,
-              empresaId: aplication.empresaId,
-              idOrigen: client.id,
-              origen: 'CLIENTE',
-              mensaje: text,
-              status: 'ENVIADO',
-              updatedAt: new Date(),
-              createdAt: new Date(),
-              messageID: messageId,
-            }
-          });
+          // await generalMessages.create({
+          //   data: {
+          //     appID: aplication.id,
+          //     empresaId: aplication.empresaId,
+          //     idOrigen: client.id,
+          //     origen: 'CLIENTE',
+          //     mensaje: text,
+          //     status: 'ENVIADO',
+          //     updatedAt: new Date(),
+          //     createdAt: new Date(),
+          //     messageID: messageId,
+          //   }
+          // });
           botMessageData.text.body = msg?.altMessage || 'Perdon, no entiendo tu mensaje 😢';
           const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);
           await generalMessages.create({
@@ -257,23 +276,23 @@ export const messagesController = async (req: Request, res: Response) => {
         const mensajeNoEntendi = await mensaje.findUnique({
           where: { id: client.ultimoMensajeId || undefined },
         });
-        
+
         // manejando las variables en el mensaje alternativo
         botMessageData.text.body = formatVariables(mensajeNoEntendi?.altMessage, client) || 'Perdon, no entiendo tu mensaje 😢';
-        await generalMessages.create({
-          data: {
-            appID: aplication.id,
-            empresaId: aplication.empresaId,
-            idOrigen: client.id,
-            origen: 'CLIENTE',
-            mensaje: text,
-            status: 'ENVIADO',
-            updatedAt: new Date(),
-            createdAt: new Date(),
-            messageID: messageId,
-          }
-        });
-        const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);        
+        // await generalMessages.create({
+        //   data: {
+        //     appID: aplication.id,
+        //     empresaId: aplication.empresaId,
+        //     idOrigen: client.id,
+        //     origen: 'CLIENTE',
+        //     mensaje: text,
+        //     status: 'ENVIADO',
+        //     updatedAt: new Date(),
+        //     createdAt: new Date(),
+        //     messageID: messageId,
+        //   }
+        // });
+        const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);
 
         await generalMessages.create({
           data: {
@@ -332,25 +351,37 @@ export const messagesController = async (req: Request, res: Response) => {
           updatedAt: new Date(),
           createdAt: new Date(),
           messageID: data.messages[0].id,
+          typeRecipient: 'AGENTE',
         }
       });
 
-      return agentLogic(client, aplication, io, res, { phoneId, from, text, messageId, name, waId, mediaData });
+      await cliente.update({
+        where: { id: client.id },
+        data: {
+          isChating: true,
+        }
+      });
+
+      // TODO: FINALIAZAR CONVERSACION TIMING
+
+      return res.status(200).json({ msg: 'Client chating' });
+
+      // return agentLogic(client, aplication, io, res, { phoneId, from, text, messageId, name, waId, mediaData });
     }
 
-    await generalMessages.create({
-      data: {
-        appID: aplication.id,
-        empresaId: aplication.empresaId,
-        idOrigen: client.id,
-        origen: 'CLIENTE',
-        mensaje: text,
-        status: 'ENVIADO',
-        updatedAt: new Date(),
-        createdAt: new Date(),
-        messageID: messageId,
-      }
-    });
+    // await generalMessages.create({
+    //   data: {
+    //     appID: aplication.id,
+    //     empresaId: aplication.empresaId,
+    //     idOrigen: client.id,
+    //     origen: 'CLIENTE',
+    //     mensaje: text,
+    //     status: 'ENVIADO',
+    //     updatedAt: new Date(),
+    //     createdAt: new Date(),
+    //     messageID: messageId,
+    //   }
+    // });
 
     const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);
 
@@ -399,3 +430,46 @@ export async function sendMessage(req: Request, res: Response) {
     console.log(error);
   }
 }
+
+export const revalidateAdminChats = async (req: Request, res: Response) => {
+  const io: SocketServer<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any> = (req as any).io;
+  const { usuario } = prisma;
+
+  const { empresaId, clienteId, chatAsesorId } = req.body;
+
+  const data = { clienteId, Cliente: { chatAsesorId } };
+  try {
+    const allAdminsSupervisors = await usuario.findMany({
+      where: {
+        empresaId,
+        OR: [
+          {
+            Roles: {
+              Acciones: {
+                some: {
+                  nombre: 'SUPER_CHAT_PERMISSION'
+                }
+              }
+            }
+          },
+          {
+            RolesDefault: {
+              Acciones: {
+                some: {
+                  nombre: 'SUPER_CHAT_PERMISSION'
+                }
+              }
+            }
+          }
+        ]
+      }
+    });
+
+    allAdminsSupervisors.forEach((admin) => {
+      io.to(admin.id.toString()).emit('supervisor-message', serializeBigInt(data));
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ msg: 'Error' });
+  }
+};

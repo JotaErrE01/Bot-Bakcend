@@ -1,24 +1,24 @@
-import { Usuario, Cliente, App, ChatHistory } from '@prisma/client';
+import { Usuario, Cliente, App, Departamentos } from '@prisma/client';
 import { Server as SocketServer } from 'socket.io';
-import cron from 'node-cron';
 import { prisma } from '../db/config';
 import { Response } from 'express';
 import { serializeBigInt } from './serializedBigInt';
 import { MetaApi } from '../api';
 import { Messages } from '.';
+import { chatTimeOut } from './chatTimeOut';
 // let timing: NodeJS.Timeout;
 // let coutner = 0;
 export const agentLogic = async (client: Cliente, aplication: App, io: SocketServer, res: Response, dataMsg: Messages.IGetDataMessage) => {
-  const { usuario, cliente, chatHistory, rolesDefault, roles, generalMessages, empresas } = prisma;
-  // timing && clearTimeout(timing);
-  // timing = setTimeout(() => {
-  //   console.log('======================');
-  //   console.log('SET TIME OUT EXECUTING');
-  //   console.log('======================');
-  // }, 10000);
-  // console.log({timing});
-  
-  // timing.refresh();
+  const { usuario, cliente, chatHistory, rolesDefault, roles, generalMessages, empresas, departamentos } = prisma;
+  const metaApi = MetaApi.createApi(aplication.token!);
+  const dataMessage = {
+    "messaging_product": "whatsapp",
+    "to": `${dataMsg.from}`,
+    "type": "text",
+    "text": {
+      body: 'No se encontro el departamento',
+    },
+  };
 
   try {
     // actualizamos el cliente de la base de datos
@@ -33,6 +33,39 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
         }
       });
     }
+
+    let department: Departamentos | null = null;
+    if (!client.asociatedDepartmentId) {
+      // verificar el departemento del agente
+      department = await departamentos.findUnique({
+        where: {
+          codigoAsociado: `${aplication.empresaId}_${dataMsg.text}`
+        }
+      });
+
+      if (!department) {
+        const { data } = await metaApi.post(`/${aplication.phoneNumberId}/messages`, dataMessage);
+        return res.status(200).json({ msg: 'Departamento no encontrado' });
+      } else {
+        dataMessage.text.body = 'En breve un asesor se pondra en contacto con usted';
+        const { data } = await metaApi.post(`/${aplication.phoneNumberId}/messages`, dataMessage);
+
+        client = await cliente.update({
+          where: {
+            id: client.id,
+          },
+          data: {
+            asociatedDepartmentId: department.id
+          }
+        });
+      }
+    }
+
+    department = await departamentos.findUnique({
+      where: {
+        id: client.asociatedDepartmentId!
+      }
+    });
 
     const empresa = await empresas.findUnique({
       where: {
@@ -76,6 +109,33 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
         }
       });
 
+      // await generalMessages.create({
+      //   data: {
+      //     mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
+      //     messageID: dataMsg.messageId,
+      //     appID: aplication.id,
+      //     empresaId: aplication.empresaId,
+      //     idOrigen: client.id,
+      //     recipientId: client.chatAsesorId,
+      //     status: 'ENVIADO',
+      //     recipientWhatsapp: empresa?.whatsapp,
+      //     origen: 'CLIENTE',
+      //     isDeleted: false,
+      //     updatedAt: new Date(),
+      //   }
+      // });
+
+      const asesor = await usuario.findUnique({
+        where: {
+          id: client.chatAsesorId
+        },
+        include: {
+          Departamentos: true,
+        }
+      });
+
+      if (!asesor || asesor.isDeleted) throw new Error('Asesor no encontrado');
+
       await generalMessages.create({
         data: {
           mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
@@ -83,30 +143,85 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           appID: aplication.id,
           empresaId: aplication.empresaId,
           idOrigen: client.id,
-          recipientId: client.chatAsesorId,
+          recipientId: asesor.id,
           status: 'ENVIADO',
           recipientWhatsapp: empresa?.whatsapp,
           origen: 'CLIENTE',
           isDeleted: false,
           updatedAt: new Date(),
+          typeRecipient: 'ASESOR',
         }
       });
 
-      setClientTiming(aplication, dataMsg, chat);
+      chatTimeOut(io, aplication, dataMsg, chat.createdAt, chat.Cliente, department?.chatTiming, asesor!);
 
       io.to(client.chatAsesorId.toString()).emit('personal-message', serializeBigInt(chat)); //!
+
+      const allAdminsSupervisors = await usuario.findMany({
+        where: {
+          empresaId: aplication.empresaId,
+          OR: [
+            {
+              Roles: {
+                Acciones: {
+                  some: {
+                    nombre: 'SUPER_CHAT_PERMISSION'
+                  }
+                }
+              }
+            },
+            {
+              RolesDefault: {
+                Acciones: {
+                  some: {
+                    nombre: 'SUPER_CHAT_PERMISSION'
+                  }
+                }
+              }
+            }
+          ]
+        }
+      });
+
+      allAdminsSupervisors.forEach(async (admin) => {
+        io.to(admin.id.toString()).emit('supervisor-message', serializeBigInt(chat));
+      });
     } else {
       const empresaId = aplication.empresaId.toString();
+      const codigoAsociado = `${empresaId}_${dataMsg.text}`;
 
       // BUSCAR EL AGENTE CON MENOS CHATS Y ASIGNARLE EL CLIENTE
       const asesores: Usuario[] = await prisma.$queryRaw`
-        SELECT * FROM Usuarios u
+        SELECT * FROM _DepartamentoToUsuario du
+        INNER JOIN Departamentos d ON du.A = d.id
+        INNER JOIN Usuarios u ON u.id = du.B
         WHERE
-          empresaId = ${empresaId}
+          u.empresaId = ${empresaId}
           AND u.quantityChats < u.maxChats
           AND u.status = TRUE
-        ORDER BY u.quantityChats ASC LIMIT 1;
+          AND d.codigoAsociado = ${codigoAsociado}
+        ORDER BY
+          u.quantityChats ASC
+        LIMIT 1;
       `;
+
+      //   console.log('🚀🚀🚀🚀🚀🚀🚀');
+      //   console.log({ asesores })
+      //   console.log('🚀🚀🚀🚀🚀🚀🚀');
+
+      //   console.log(`
+      //   SELECT * FROM _DepartamentoToUsuario du
+      //   INNER JOIN Departamentos d ON du.A = d.id
+      //   INNER JOIN Usuarios u ON u.id = du.B
+      //   WHERE
+      //     u.empresaId = ${empresaId}
+      //     AND u.quantityChats < u.maxChats
+      //     AND u.status = TRUE
+      //     AND d.codigoAsociado = ${empresaId}_${dataMsg.text}
+      //   ORDER BY
+      //     u.quantityChats ASC
+      //   LIMIT 1;
+      // `);
 
 
       // Asignar el cliente con el agente con menos chats
@@ -124,11 +239,9 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
             }
           });
 
-          const hasPermission = roleDefault?.Acciones.find((action) => action.nombre === 'CHAT_PERMISSION');
+          const hasPermission = roleDefault?.Acciones.find((action) => action.nombre === 'CHAT_PERMISSION' || action.nombre === 'SUPER_CHAT_PERMISSION');
 
-          if (!hasPermission) {
-            return res.status(403).json({ msg: 'El agente no tiene permiso para chatear' });
-          }
+          if (!hasPermission) return res.status(403).json({ msg: 'El agente no tiene permiso para chatear' });
         } else if (asesor.roleId) {
           const role = await roles.findUnique({
             where: {
@@ -139,11 +252,9 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
             }
           });
 
-          const hasPermission = role?.Acciones.find((action) => action.nombre === 'CHAT_PERMISSION');
+          const hasPermission = role?.Acciones.find((action) => action.nombre === 'CHAT_PERMISSION' || action.nombre === 'SUPER_CHAT_PERMISSION');
 
-          if (!hasPermission) {
-            return res.status(403).json({ msg: 'El agente no tiene permiso para chatear' });
-          }
+          if (!hasPermission) return res.status(403).json({ msg: 'El agente no tiene permiso para chatear' });
         }
 
         await usuario.update({
@@ -166,38 +277,6 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           }
         });
 
-        await generalMessages.create({
-          data: {
-            mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
-            messageID: dataMsg.messageId,
-            appID: aplication.id,
-            empresaId: aplication.empresaId,
-            idOrigen: client.id,
-            recipientId: asesor.id,
-            status: 'ENVIADO',
-            recipientWhatsapp: empresa?.whatsapp,
-            origen: 'CLIENTE',
-            isDeleted: false,
-            updatedAt: new Date(),
-          }
-        });
-
-        // const chat = {
-        //   mensaje: dataMsg.text,
-        //   clienteId: client.id,
-        //   asesorId: asesor.id,
-        //   isClient: true,
-        //   empresaId: aplication.empresaId,
-        //   ...mediaChatObj
-        // }
-
-        // await chatHistory.create({
-        //   data: {
-        //     mensaje: dataMsg.text,
-        //     clienteId: BigInt(Number(client.id)),
-        //   }
-        // })
-
         const chat = await chatHistory.create({
           data: {
             mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
@@ -213,28 +292,45 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           }
         });
 
-        console.log({chat});
-        setClientTiming(aplication, dataMsg, chat);
+        await generalMessages.create({
+          data: {
+            mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
+            messageID: dataMsg.messageId,
+            appID: aplication.id,
+            empresaId: aplication.empresaId,
+            idOrigen: client.id,
+            recipientId: asesor.id,
+            status: 'ENVIADO',
+            recipientWhatsapp: empresa?.whatsapp,
+            origen: 'CLIENTE',
+            isDeleted: false,
+            updatedAt: new Date(),
+            typeRecipient: 'AGENTE',
+          }
+        });
+
+        chatTimeOut(io, aplication, dataMsg, chat.createdAt, chat.Cliente, department?.chatTiming, asesor);
 
         io.to(asesor.id.toString()).emit('personal-message', serializeBigInt(chat));
+        io.to(asesor.id.toString()).emit('supervisor-message', serializeBigInt(chat));
         return res.status(200).json({ msg: 'Mensaje enviado personal-message' });
       }
 
-      await generalMessages.create({
-        data: {
-          mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
-          messageID: dataMsg.messageId,
-          appID: aplication.id,
-          empresaId: aplication.empresaId,
-          idOrigen: client.id,
-          recipientId: null,
-          status: 'ENVIADO',
-          recipientWhatsapp: empresa?.whatsapp,
-          origen: 'CLIENTE',
-          isDeleted: false,
-          updatedAt: new Date(),
-        }
-      });
+      // await generalMessages.create({
+      //   data: {
+      //     mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
+      //     messageID: dataMsg.messageId,
+      //     appID: aplication.id,
+      //     empresaId: aplication.empresaId,
+      //     idOrigen: client.id,
+      //     recipientId: null,
+      //     status: 'ENVIADO',
+      //     recipientWhatsapp: empresa?.whatsapp,
+      //     origen: 'CLIENTE',
+      //     isDeleted: false,
+      //     updatedAt: new Date(),
+      //   }
+      // });
 
       const chat = await chatHistory.create({
         data: {
@@ -253,7 +349,7 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
         }
       });
 
-      setClientTiming(aplication, dataMsg, chat);
+      chatTimeOut(io, aplication, dataMsg, chat.createdAt, chat.Cliente, department?.chatTiming);
       io.to(empresaId).emit('enterprise-message', serializeBigInt(chat)); //!
     }
 
@@ -265,85 +361,23 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
   }
 }
 
+// const setClientTiming = (aplication: App, dataMsg: Messages.IGetDataMessage, chat: ChatHistory & { Cliente: Cliente; }, timing: number = 5) => {
+//   const createdAt = new Date(chat.createdAt);
+//   const minutes = timing * 60000;
+//   // const stopTime = new Date(createdAt.getTime() + (timing * 1000));
+//   const stopTime = new Date(createdAt.getTime() + minutes);
+//   const cronString = `${stopTime.getSeconds()} ${stopTime.getMinutes()} ${stopTime.getHours()} ${stopTime.getDate()} ${stopTime.getMonth() + 1} *`;
 
-// let counter = 0;
-// let interval: NodeJS.Timeout;
+//   const task = cron.getTasks().get(chat.Cliente.id.toString());
+//   if (task) task.stop();
 
-const setClientTiming = (aplication: App, dataMsg: Messages.IGetDataMessage, chat: ChatHistory & { Cliente: Cliente; }, timing: number = 1) => {
-  const createdAt = new Date(chat.createdAt);
-  const minutes = timing * 60000;
-  // const stopTime = new Date(createdAt.getTime() + (timing * 1000));
-  const stopTime = new Date(createdAt.getTime() + minutes);
-  const cronString = `${stopTime.getSeconds()} ${stopTime.getMinutes()} ${stopTime.getHours()} ${stopTime.getDate()} ${stopTime.getMonth() + 1} *`;
-
-  const task = cron.getTasks().get(chat.Cliente.id.toString());
-  if(task) task.stop();
-
-  console.log({ createdAt, stopTime, cronString });
-
-  const job = cron.schedule(cronString, async () => {
-    await sendStopMessage(dataMsg, aplication, chat);
-    job.stop();
-  }, {
-    scheduled: true,
-    timezone: 'America/Guayaquil',
-    name: chat.Cliente.id.toString()
-  });
-}
-
-const sendStopMessage = async (dataMsg: Messages.IGetDataMessage, aplication: App, chat: ChatHistory & { Cliente: Cliente; }): Promise<boolean> => {
-  const { cliente, usuario } = prisma;
-  const dataMessage = {
-    "messaging_product": "whatsapp",
-    "to": `${dataMsg.from}`,
-    "type": "text",
-    "text": {
-      body: 'El tiempo de respuesta ha finalizado. Si desea continuar con la conversación, por favor escriba "Hola"',
-    },
-  };
-
-  const metaApi = MetaApi.createApi(aplication.token!);
-
-  try {
-    const client = await cliente.findUnique({
-      where: {
-        id: chat.Cliente.id,
-      },
-    });
-
-    if(!client || client.isDeleted) throw new Error('Cliente no encontrado');
-    if(!client.isChating) throw new Error('El cliente no está chateando');
-
-    await cliente.update({
-      where: {
-        id: chat.Cliente.id,
-      },
-      data: {
-        chatAsesorId: null,
-        ultimoMensajeId: null,
-        conversacionId: null,
-        isChating: false,
-      }
-    });
-
-    if(chat.asesorId) {
-      await usuario.update({
-        where: {
-          id: chat.asesorId,
-        },
-        data: {
-          quantityChats: {
-            decrement: 1,
-          }
-        }
-      });
-    }
-
-    const { data } = await metaApi.post(`/${aplication.phoneNumberId}/messages`, dataMessage);
-    return true; 
-  } catch (error) {
-    console.log(error);
-    return false;
-  }
-}
+//   const job = cron.schedule(cronString, async () => {
+//     await sendStopMessage(dataMsg, aplication, chat);
+//     job.stop();
+//   }, {
+//     scheduled: true,
+//     timezone: 'America/Guayaquil',
+//     name: chat.Cliente.id.toString()
+//   });
+// }
 

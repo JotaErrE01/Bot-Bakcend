@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { MetaApi } from '../api';
-import { messages } from '../controllers';
+import { messages, taskController } from '../controllers';
 
 const router = Router();
 
 router.get('/', (req, res) => {
   res.send('Hello World!');
 })
+
+router.post('/revalidateAdminChats', messages.revalidateAdminChats);
 
 // validar token con meta
 router.get( '/:webHookApi', messages.validarWebHookToken);
@@ -38,6 +40,8 @@ router.post( '/send', async (req, res) => {
     res.status(500).json({ msg: 'Error en el servidor' });
   }
   
-} );
+});
+
+router.delete( '/:taskId', taskController.deleteCronTask );
 
 export default router;

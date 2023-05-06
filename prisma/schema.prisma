@@ -73,18 +73,16 @@ model Usuario {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   empresaId         String
-  departamentoId    Int?
   ChatHistory       ChatHistory[]
   RespuestasRapidas RespuestasRapidas[]
-  Departamentos     Departamentos?      @relation(fields: [departamentoId], references: [id])
   Empresas          Empresas            @relation("EmpresasToUsuarios", fields: [empresaId], references: [id])
   RolesDefault      RolesDefault?       @relation("RolesDefaultToUsuarios", fields: [roleDefaultId], references: [id])
   Roles             Roles?              @relation("RolesToUsuarios", fields: [roleId], references: [id])
+  Departamentos     Departamentos[]     @relation("DepartamentoToUsuario")
 
   @@index([empresaId], map: "Usuarios_empresaId_fkey")
   @@index([roleDefaultId], map: "Usuarios_roleDefaultId_fkey")
   @@index([roleId], map: "Usuarios_roleId_fkey")
-  @@index([departamentoId], map: "Usuarios_departamentoId_fkey")
   @@map("Usuarios")
 }
 
@@ -110,34 +108,35 @@ model App {
 }
 
 model Cliente {
-  id              BigInt        @id @default(autoincrement())
-  nombre          String        @db.VarChar(100)
-  apellido        String        @db.VarChar(100)
-  nombreEmpresa   String?       @db.VarChar(100)
-  whatsapp        String
-  paisId          Int?
-  email           String?       @db.VarChar(100)
-  categoria1      String?
-  categoria2      String?
-  num1            Decimal?      @db.Decimal(18, 2)
-  num2            Decimal?      @db.Decimal(18, 2)
-  text1           String?
-  text2           String?
-  date1           DateTime?
-  date2           DateTime?
-  conversacionId  Int?
-  ultimoMensajeId Int?
-  isChating       Boolean?      @default(false)
-  chatAsesorId    BigInt?
-  isDeleted       Boolean?      @default(false)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  empresaId       String
-  ChatHistory     ChatHistory[]
-  botId           Conversacion? @relation(fields: [conversacionId], references: [id])
-  Empresas        Empresas      @relation("ClientesToEmpresas", fields: [empresaId], references: [id])
-  Paises          Paises?       @relation(fields: [paisId], references: [id])
-  ultimoMensaje   Mensaje?      @relation(fields: [ultimoMensajeId], references: [id])
+  id                    BigInt        @id @default(autoincrement())
+  empresaId             String
+  nombre                String        @db.VarChar(100)
+  apellido              String        @db.VarChar(100)
+  nombreEmpresa         String?       @db.VarChar(100)
+  whatsapp              String
+  paisId                Int?
+  email                 String?       @db.VarChar(100)
+  categoria1            String?
+  categoria2            String?
+  num1                  Decimal?      @db.Decimal(18, 2)
+  num2                  Decimal?      @db.Decimal(18, 2)
+  text1                 String?
+  text2                 String?
+  date1                 DateTime?
+  date2                 DateTime?
+  conversacionId        Int?
+  ultimoMensajeId       Int?
+  isChating             Boolean?      @default(false)
+  chatAsesorId          BigInt?
+  isDeleted             Boolean?      @default(false)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  asociatedDepartmentId Int?
+  ChatHistory           ChatHistory[]
+  botId                 Conversacion? @relation(fields: [conversacionId], references: [id])
+  Empresas              Empresas      @relation("ClientesToEmpresas", fields: [empresaId], references: [id])
+  Paises                Paises?       @relation(fields: [paisId], references: [id])
+  ultimoMensaje         Mensaje?      @relation(fields: [ultimoMensajeId], references: [id])
 
   @@index([conversacionId], map: "Clientes_conversacionId_fkey")
   @@index([empresaId], map: "Clientes_empresaId_fkey")
@@ -232,12 +231,12 @@ model CampaignDetails {
 }
 
 model Acciones {
-  id           Int            @id @default(autoincrement())
-  nombre       Actions        @unique
-  createdAt    DateTime       @default(now())
+  id           Int             @id @default(autoincrement())
+  nombre       Acciones_nombre @unique
+  createdAt    DateTime        @default(now())
   updatedAt    DateTime
-  Roles        Roles[]        @relation("AccionToRol")
-  RolesDefault RolesDefault[] @relation("AccionToRolDefault")
+  Roles        Roles[]         @relation("AccionToRol")
+  RolesDefault RolesDefault[]  @relation("AccionToRolDefault")
 }
 
 model Empresas {
@@ -246,6 +245,7 @@ model Empresas {
   whatsapp        String            @unique @db.VarChar(15)
   nombre          String            @db.VarChar(100)
   logo            String?           @db.VarChar(100)
+  chatTiming      Int               @default(5)
   isDeleted       Boolean?          @default(false)
   createdAt       DateTime          @default(now())
   updatedAt       DateTime
@@ -275,13 +275,13 @@ model Roles {
 }
 
 model RolesDefault {
-  id        String       @id
-  nombre    DefaultRoles @unique
-  isDeleted Boolean?     @default(false)
-  createdAt DateTime     @default(now())
+  id        String              @id
+  nombre    RolesDefault_nombre @unique
+  isDeleted Boolean?            @default(false)
+  createdAt DateTime            @default(now())
   updatedAt DateTime
-  Usuario   Usuario[]    @relation("RolesDefaultToUsuarios")
-  Acciones  Acciones[]   @relation("AccionToRolDefault")
+  Usuario   Usuario[]           @relation("RolesDefaultToUsuarios")
+  Acciones  Acciones[]          @relation("AccionToRolDefault")
 }
 
 model ChatHistory {
@@ -351,7 +351,7 @@ model GeneralMessages {
   messageID         String?                     @unique
   empresaId         String
   appID             Int
-  origen            GeneralMessages_origen
+  origen            String
   idOrigen          BigInt
   mensaje           String?
   media             String?
@@ -364,18 +364,20 @@ model GeneralMessages {
   createdAt         DateTime                    @default(now())
   updatedAt         DateTime
   isDeleted         Boolean?                    @default(false)
+  typeRecipient     String?                     @default("BOT")
 }
 
 model Departamentos {
   id             Int       @id @default(autoincrement())
   nombre         String    @db.VarChar(100)
   codigoAsociado String    @unique @db.VarChar(100)
+  chatTiming     Int       @default(5)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime
   empresaId      String
   isDeleted      Boolean?  @default(false)
   Empresas       Empresas  @relation(fields: [empresaId], references: [id])
-  Usuarios       Usuario[]
+  Usuarios       Usuario[] @relation("DepartamentoToUsuario")
 
   @@index([empresaId], map: "Departamentos_empresaId_fkey")
 }
@@ -394,7 +396,26 @@ enum Status {
   CANCELADO
 }
 
-enum Actions {
+enum ConversationType {
+  DEFAULT
+}
+
+enum GeneralMessages_headerType {
+  TEXT
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+enum RolesDefault_nombre {
+  ADMIN
+  OPERADOR
+  CREADOR_PLANTILLAS
+  AGENTE
+  SUPERVISOR
+}
+
+enum Acciones_nombre {
   CREAR_APP
   EDITAR_APP
   ELIMINAR_APP
@@ -425,31 +446,6 @@ enum Actions {
   VER_ROL
   CREAR_CAMPAIGNS
   CHAT_PERMISSION
+  SUPER_CHAT_PERMISSION
   VER_LOGS
-}
-
-enum DefaultRoles {
-  ADMIN
-  OPERADOR
-  CREADOR_PLANTILLAS
-  AGENTE
-}
-
-enum ConversationType {
-  DEFAULT
-}
-
-enum GeneralMessages_origen {
-  CLIENTE
-  AGENTE
-  PLANTILLA
-  CAMPAIGN
-  BOT
-}
-
-enum GeneralMessages_headerType {
-  TEXT
-  IMAGE
-  VIDEO
-  DOCUMENT
 }
