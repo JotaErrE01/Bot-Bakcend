@@ -5,7 +5,10 @@ import { Cliente } from '@prisma/client';
 
 export const validCodes = async (client: any, text: string, botMessageData: any, metaApi: AxiosInstance, phoneId: string, isMainMessage: boolean) => {
   const { mensaje, cliente } = prisma;
-  const { longName, shortName, codigo, ...rest } = client;  
+  const { longName, shortName, codigo, ...rest } = client;
+
+  rest.isDeleted = Boolean(rest.isDeleted);
+  rest.isChating = Boolean(rest.isChating);
 
   let msg: any = null;
   try {

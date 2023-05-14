@@ -136,22 +136,22 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
 
       if (!asesor || asesor.isDeleted) throw new Error('Asesor no encontrado');
 
-      await generalMessages.create({
-        data: {
-          mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
-          messageID: dataMsg.messageId,
-          appID: aplication.id,
-          empresaId: aplication.empresaId,
-          idOrigen: client.id,
-          recipientId: asesor.id,
-          status: 'ENVIADO',
-          recipientWhatsapp: empresa?.whatsapp,
-          origen: 'CLIENTE',
-          isDeleted: false,
-          updatedAt: new Date(),
-          typeRecipient: 'ASESOR',
-        }
-      });
+      // await generalMessages.create({
+      //   data: {
+      //     mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
+      //     messageID: dataMsg.messageId,
+      //     appID: aplication.id,
+      //     empresaId: aplication.empresaId,
+      //     idOrigen: client.id,
+      //     recipientId: asesor.id,
+      //     status: 'ENVIADO',
+      //     recipientWhatsapp: empresa?.whatsapp,
+      //     origen: 'CLIENTE',
+      //     isDeleted: false,
+      //     updatedAt: new Date(),
+      //     typeRecipient: 'ASESOR',
+      //   }
+      // });
 
       chatTimeOut(io, aplication, dataMsg, chat.createdAt, chat.Cliente, department?.chatTiming, asesor!);
 
@@ -292,22 +292,22 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           }
         });
 
-        await generalMessages.create({
-          data: {
-            mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
-            messageID: dataMsg.messageId,
-            appID: aplication.id,
-            empresaId: aplication.empresaId,
-            idOrigen: client.id,
-            recipientId: asesor.id,
-            status: 'ENVIADO',
-            recipientWhatsapp: empresa?.whatsapp,
-            origen: 'CLIENTE',
-            isDeleted: false,
-            updatedAt: new Date(),
-            typeRecipient: 'AGENTE',
-          }
-        });
+        // await generalMessages.create({
+        //   data: {
+        //     mensaje: dataMsg.mediaData?.caption || dataMsg.text || '',
+        //     messageID: dataMsg.messageId,
+        //     appID: aplication.id,
+        //     empresaId: aplication.empresaId,
+        //     idOrigen: client.id,
+        //     recipientId: asesor.id,
+        //     status: 'ENVIADO',
+        //     recipientWhatsapp: empresa?.whatsapp,
+        //     origen: 'CLIENTE',
+        //     isDeleted: false,
+        //     updatedAt: new Date(),
+        //     typeRecipient: 'AGENTE',
+        //   }
+        // });
 
         chatTimeOut(io, aplication, dataMsg, chat.createdAt, chat.Cliente, department?.chatTiming, asesor);
 

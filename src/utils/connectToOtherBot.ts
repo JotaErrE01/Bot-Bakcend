@@ -31,39 +31,39 @@ export const connectToOtherBot = async (msg: Mensaje, client: Cliente, metaApi: 
       }
     });
 
-    await generalMessages.create({
-      data: {
-        appID: aplication.id,
-        empresaId: aplication.empresaId,
-        idOrigen: client.id,
-        origen: 'CLIENTE',
-        mensaje: dataMsg.text || null,
-        status: 'ENVIADO',
-        updatedAt: new Date(),
-        createdAt: new Date(),
-        messageID: dataMsg.messageId,
-      }
-    });
+    // await generalMessages.create({
+    //   data: {
+    //     appID: aplication.id,
+    //     empresaId: aplication.empresaId,
+    //     idOrigen: client.id,
+    //     origen: 'CLIENTE',
+    //     mensaje: dataMsg.text || null,
+    //     status: 'ENVIADO',
+    //     updatedAt: new Date(),
+    //     createdAt: new Date(),
+    //     messageID: dataMsg.messageId,
+    //   }
+    // });
 
     botMessageData.text.body = formatVariables(newMsg?.cuerpo as string, client)!;
 
     const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);
 
-    await generalMessages.create({
-      data: {
-        appID: aplication.id,
-        empresaId: aplication.empresaId,
-        idOrigen: (msg as any).id,
-        origen: 'BOT',
-        mensaje: botMessageData.text.body,
-        status: 'ENVIADO',
-        updatedAt: new Date(),
-        createdAt: new Date(),
-        messageID: data.messages[0].id,
-        recipientId: client.id,
-        recipientWhatsapp: client.whatsapp,
-      }
-    });
+    // await generalMessages.create({
+    //   data: {
+    //     appID: aplication.id,
+    //     empresaId: aplication.empresaId,
+    //     idOrigen: (msg as any).id,
+    //     origen: 'BOT',
+    //     mensaje: botMessageData.text.body,
+    //     status: 'ENVIADO',
+    //     updatedAt: new Date(),
+    //     createdAt: new Date(),
+    //     messageID: data.messages[0].id,
+    //     recipientId: client.id,
+    //     recipientWhatsapp: client.whatsapp,
+    //   }
+    // });
 
     return res.status(200).json({ msg: 'Message Sent' });
   } catch (error) {
