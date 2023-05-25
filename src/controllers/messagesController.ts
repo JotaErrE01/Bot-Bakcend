@@ -313,6 +313,11 @@ export const messagesController = async (req: Request, res: Response) => {
       }
 
       // verfica si es un mensaje que conecta con otro Bot
+      console.log('====================================')
+      console.log('====================================')
+      console.log('msg.botIdConexion', { msg })
+      console.log('====================================')
+      console.log('====================================')
       if (msg.botIdConexion)
         return await connectToOtherBot(msg, client, metaApi, botMessageData, phoneId, res, aplication, { phoneId, from, text, messageId, name, waId, mediaData });
 

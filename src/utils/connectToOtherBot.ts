@@ -10,6 +10,11 @@ export const connectToOtherBot = async (msg: Mensaje, client: Cliente, metaApi: 
   const { conversacion, cliente, generalMessages } = prisma;
 
   try {
+
+    console.log('💩💩💩💩');
+    console.log('💩💩💩💩');
+    
+
     const newBot = await conversacion.findUnique({
       where: { id: msg.botIdConexion! },
       include: {
