@@ -1,4 +1,4 @@
-import { Usuario, Cliente, App, Departamentos } from '@prisma/client';
+import { Usuario, Cliente, App, Departamento } from '@prisma/client';
 import { Server as SocketServer } from 'socket.io';
 import { prisma } from '../db/config';
 import { Response } from 'express';
@@ -9,7 +9,7 @@ import { chatTimeOut } from './chatTimeOut';
 // let timing: NodeJS.Timeout;
 // let coutner = 0;
 export const agentLogic = async (client: Cliente, aplication: App, io: SocketServer, res: Response, dataMsg: Messages.IGetDataMessage) => {
-  const { usuario, cliente, chatHistory, rolesDefault, roles, generalMessages, empresas, departamentos } = prisma;
+  const { usuario, cliente, chatHistory, rolDefault, rol, generalMessage, empresa, departamento } = prisma;
   const metaApi = MetaApi.createApi(aplication.token!);
   const dataMessage = {
     "messaging_product": "whatsapp",
@@ -34,10 +34,10 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
       });
     }
 
-    let department: Departamentos | null = null;
+    let department: Departamento | null = null;
     if (!client.asociatedDepartmentId) {
       // verificar el departemento del agente
-      department = await departamentos.findUnique({
+      department = await departamento.findUnique({
         where: {
           codigoAsociado: `${aplication.empresaId}_${dataMsg.text}`
         }
@@ -61,19 +61,19 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
       }
     }
 
-    department = await departamentos.findUnique({
+    department = await departamento.findUnique({
       where: {
         id: client.asociatedDepartmentId!
       }
     });
 
-    const empresa = await empresas.findUnique({
+    const empresaDb = await empresa.findUnique({
       where: {
         id: aplication.empresaId
       },
     });
 
-    if (empresa?.isDeleted) return res.status(404).json({ msg: 'Empresa no encontrada' });
+    if (empresaDb?.isDeleted) return res.status(404).json({ msg: 'Empresa no encontrada' });
 
     let mediaChatObj: { media?: string, mediaType?: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT' } = {};
     if (dataMsg.mediaData) {
@@ -105,9 +105,16 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           updatedAt: new Date(),
         },
         include: {
-          Cliente: true,
+          cliente: {
+            include: {
+              pais: true
+            }
+          }
         }
       });
+
+      console.log('chat', chat);
+
 
       // await generalMessages.create({
       //   data: {
@@ -153,7 +160,7 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
       //   }
       // });
 
-      chatTimeOut(io, aplication, dataMsg, chat.createdAt, chat.Cliente, department?.chatTiming, asesor!);
+      chatTimeOut(io, aplication, dataMsg, chat.createdAt, chat.cliente, department?.chatTiming, asesor!);
 
       io.to(client.chatAsesorId.toString()).emit('personal-message', serializeBigInt(chat)); //!
 
@@ -162,8 +169,8 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           empresaId: aplication.empresaId,
           OR: [
             {
-              Roles: {
-                Acciones: {
+              role: {
+                acciones: {
                   some: {
                     nombre: 'SUPER_CHAT_PERMISSION'
                   }
@@ -171,8 +178,8 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
               }
             },
             {
-              RolesDefault: {
-                Acciones: {
+              roleDefault: {
+                acciones: {
                   some: {
                     nombre: 'SUPER_CHAT_PERMISSION'
                   }
@@ -230,29 +237,29 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
 
         // verificar si tiene permiso para chatear
         if (asesor.roleDefaultId) {
-          const roleDefault = await rolesDefault.findUnique({
+          const roleDefault = await rolDefault.findUnique({
             where: {
               id: asesor.roleDefaultId
             },
             include: {
-              Acciones: true
+              acciones: true
             }
           });
 
-          const hasPermission = roleDefault?.Acciones.find((action) => action.nombre === 'CHAT_PERMISSION' || action.nombre === 'SUPER_CHAT_PERMISSION');
+          const hasPermission = roleDefault?.acciones.find((action) => action.nombre === 'CHAT_PERMISSION' || action.nombre === 'SUPER_CHAT_PERMISSION');
 
           if (!hasPermission) return res.status(403).json({ msg: 'El agente no tiene permiso para chatear' });
         } else if (asesor.roleId) {
-          const role = await roles.findUnique({
+          const role = await rol.findUnique({
             where: {
               id: asesor.roleId
             },
             include: {
-              Acciones: true
+              acciones: true
             }
           });
 
-          const hasPermission = role?.Acciones.find((action) => action.nombre === 'CHAT_PERMISSION' || action.nombre === 'SUPER_CHAT_PERMISSION');
+          const hasPermission = role?.acciones.find((action) => action.nombre === 'CHAT_PERMISSION' || action.nombre === 'SUPER_CHAT_PERMISSION');
 
           if (!hasPermission) return res.status(403).json({ msg: 'El agente no tiene permiso para chatear' });
         }
@@ -288,9 +295,18 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
             updatedAt: new Date(),
           },
           include: {
-            Cliente: true,
+            cliente: {
+              include: {
+                pais: true,
+              }
+            }
           }
         });
+
+        console.log('🚀🚀🚀🚀🚀🚀🚀');
+        console.log({ chat });
+        console.log('🚀🚀🚀🚀🚀🚀🚀');
+
 
         // await generalMessages.create({
         //   data: {
@@ -309,7 +325,7 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
         //   }
         // });
 
-        chatTimeOut(io, aplication, dataMsg, chat.createdAt, chat.Cliente, department?.chatTiming, asesor);
+        chatTimeOut(io, aplication, dataMsg, chat.createdAt, chat.cliente, department?.chatTiming, asesor);
 
         io.to(asesor.id.toString()).emit('personal-message', serializeBigInt(chat));
         io.to(asesor.id.toString()).emit('supervisor-message', serializeBigInt(chat));
@@ -345,11 +361,15 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
           updatedAt: new Date(),
         },
         include: {
-          Cliente: true,
+          cliente: {
+            include: {
+              pais: true
+            }
+          }
         }
       });
 
-      chatTimeOut(io, aplication, dataMsg, chat.createdAt, chat.Cliente, department?.chatTiming);
+      chatTimeOut(io, aplication, dataMsg, chat.createdAt, chat.cliente, department?.chatTiming);
       io.to(empresaId).emit('enterprise-message', serializeBigInt(chat)); //!
     }
 

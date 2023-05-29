@@ -44,7 +44,7 @@ export const messagesController = async (req: Request, res: Response) => {
         webHookApi: `${process.env.APP_HOST}/${webHookApi}`
       },
       include: {
-        Empresas: true,
+        empresa: true,
       }
     });
 
@@ -104,7 +104,7 @@ export const messagesController = async (req: Request, res: Response) => {
     }
 
     // create prisma instance
-    const { cliente, mensaje, mensajeLog, conversacion, generalMessages } = prisma;
+    const { cliente, mensaje, mensajeLog, conversacion, generalMessage } = prisma;
 
     // CONTROLAR QUE META NO ENVIE EL MISMO MENSAJE
     const message = await mensajeLog.findUnique({
@@ -153,7 +153,7 @@ export const messagesController = async (req: Request, res: Response) => {
 
     let msg;
 
-    const createdMessageData = await generalMessages.create({
+    const createdMessageData = await generalMessage.create({
       data: {
         appID: aplication.id,
         empresaId: aplication.empresaId,
@@ -167,7 +167,7 @@ export const messagesController = async (req: Request, res: Response) => {
       }
     });
 
-    chatTimeOut(io, aplication, dataMessage, createdMessageData.createdAt, client, aplication.Empresas.chatTiming);
+    chatTimeOut(io, aplication, dataMessage, createdMessageData.createdAt, client, aplication.empresa.chatTiming);
 
     if (!client.conversacionId && !client.isChating) {
       const defaultBot = await conversacion.findFirst({
@@ -238,7 +238,7 @@ export const messagesController = async (req: Request, res: Response) => {
           // });
           botMessageData.text.body = msg?.altMessage || 'Perdon, no entiendo tu mensaje 😢';
           const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);
-          await generalMessages.create({
+          await generalMessage.create({
             data: {
               appID: aplication.id,
               empresaId: aplication.empresaId,
@@ -294,7 +294,7 @@ export const messagesController = async (req: Request, res: Response) => {
         // });
         const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);
 
-        await generalMessages.create({
+        await generalMessage.create({
           data: {
             appID: aplication.id,
             empresaId: aplication.empresaId,
@@ -345,7 +345,7 @@ export const messagesController = async (req: Request, res: Response) => {
     if (msg?.mensajeAsesor) {
       const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);
 
-      await generalMessages.create({
+      await generalMessage.create({
         data: {
           appID: aplication.id,
           empresaId: aplication.empresaId,
@@ -390,7 +390,7 @@ export const messagesController = async (req: Request, res: Response) => {
 
     const { data } = await metaApi.post(`/${phoneId}/messages`, botMessageData);
 
-    await generalMessages.create({
+    await generalMessage.create({
       data: {
         appID: aplication.id,
         empresaId: aplication.empresaId,
@@ -442,15 +442,15 @@ export const revalidateAdminChats = async (req: Request, res: Response) => {
 
   const { empresaId, clienteId, chatAsesorId } = req.body;
 
-  const data = { clienteId, Cliente: { chatAsesorId } };
+  const data = { clienteId, cliente: { chatAsesorId } };
   try {
     const allAdminsSupervisors = await usuario.findMany({
       where: {
         empresaId,
         OR: [
           {
-            Roles: {
-              Acciones: {
+            role: {
+              acciones: {
                 some: {
                   nombre: 'SUPER_CHAT_PERMISSION'
                 }
@@ -458,8 +458,8 @@ export const revalidateAdminChats = async (req: Request, res: Response) => {
             }
           },
           {
-            RolesDefault: {
-              Acciones: {
+            roleDefault: {
+              acciones: {
                 some: {
                   nombre: 'SUPER_CHAT_PERMISSION'
                 }
@@ -473,6 +473,8 @@ export const revalidateAdminChats = async (req: Request, res: Response) => {
     allAdminsSupervisors.forEach((admin) => {
       io.to(admin.id.toString()).emit('supervisor-message', serializeBigInt(data));
     });
+
+    return res.status(200).json({ msg: 'Message Sent' });
   } catch (error) {
     console.log(error);
     return res.status(500).json({ msg: 'Error' });

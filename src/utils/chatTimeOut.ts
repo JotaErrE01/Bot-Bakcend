@@ -1,19 +1,16 @@
-import { App, ChatHistory, Cliente, Usuario } from '@prisma/client';
-import cron from 'node-cron';
-import { Messages } from ".";
-import { MetaApi } from "../api";
-import { prisma } from '../db/config';
+import { App, Cliente, Usuario } from '@prisma/client';
 import { Server as SocketServer } from 'socket.io';
+import cron from 'node-cron';
+import { serializeBigInt } from './serializedBigInt';
+import { prisma } from '../db/config';
+import { MetaApi } from "../api";
+import { Messages } from ".";
 
 export const chatTimeOut = (io: SocketServer, aplication: App, dataMsg: Messages.IGetDataMessage, startDate: Date, client: Cliente, timing: number = 5, asesor?: Usuario) => {
-  console.log('🧑‍💻🧑‍💻🧑‍💻🧑‍💻🧑‍💻🧑‍💻');
-  
   // get the current date with javascript
   const createdAt = new Date(startDate);
-  console.log(startDate);
-  
+
   const minutes = timing * 60000;
-  console.log(minutes);
   // const stopTime = new Date(createdAt.getTime() + (timing * 1000));
   const stopTime = new Date(createdAt.getTime() + minutes);
   const cronString = `${stopTime.getSeconds()} ${stopTime.getMinutes()} ${stopTime.getHours()} ${stopTime.getDate()} ${stopTime.getMonth() + 1} *`;
@@ -21,12 +18,10 @@ export const chatTimeOut = (io: SocketServer, aplication: App, dataMsg: Messages
   const task = cron.getTasks().get(client.id.toString());
   if (task) task.stop();
 
-  console.log({task});
-  
-  
+
   const job = cron.schedule(cronString, async () => {
     await sendStopMessage(dataMsg, aplication, client, asesor);
-    io.emit('chatTimeOut', { clienteId: client.id });  
+    io.emit('chatTimeOut', serializeBigInt({ clienteId: client.id }));
     job.stop();
   }, {
     scheduled: true,
@@ -45,9 +40,6 @@ const sendStopMessage = async (dataMsg: Messages.IGetDataMessage, aplication: Ap
       body: 'El tiempo de respuesta ha finalizado. Si desea continuar con la conversación, por favor escriba "Hola"',
     },
   };
-
-  console.log('🛑🛑🛑🛑🛑');
-  
 
   const metaApi = MetaApi.createApi(aplication.token!);
 
@@ -73,11 +65,11 @@ const sendStopMessage = async (dataMsg: Messages.IGetDataMessage, aplication: Ap
         asociatedDepartmentId: null,
       }
     });
-
-    if(asesor){
+    
+    if(clientDb.chatAsesorId) {
       await usuario.update({
         where: {
-          id: asesor.id,
+          id: clientDb.chatAsesorId,
         },
         data: {
           quantityChats: {
@@ -86,6 +78,18 @@ const sendStopMessage = async (dataMsg: Messages.IGetDataMessage, aplication: Ap
         }
       });
     }
+    // await usuario.update({
+    //   where: {
+    //     id: asesor.id,
+    //   },
+    //   data: {
+    //     quantityChats: {
+    //       decrement: 1,
+    //     }
+    //   }
+    // });
+    // if (asesor) {
+    // }
     // if (chat.asesorId) {
     // }
 

@@ -29,17 +29,17 @@ export const sendMedia = async (msg: Mensaje | null, phoneId: string, metaApi: A
 
   try {
     
-    const { generalMessages, conversacion } = prisma;
+    const { generalMessage, conversacion } = prisma;
     const conversation = await conversacion.findUnique({
       where: {
         id: msg?.conversacionId
       },
       include: {
-        Empresas: true,
+        empresa: true,
       }
     });
 
-    await generalMessages.create({
+    await generalMessage.create({
       data: {
         appID: aplication.id,
         empresaId: aplication.empresaId,
@@ -50,7 +50,7 @@ export const sendMedia = async (msg: Mensaje | null, phoneId: string, metaApi: A
         updatedAt: new Date(),
         createdAt: new Date(),
         recipientId: client.chatAsesorId,
-        recipientWhatsapp: conversation?.Empresas.whatsapp,
+        recipientWhatsapp: conversation?.empresa.whatsapp,
         messageID: dataMsg.messageId,
       }
     });
@@ -59,13 +59,13 @@ export const sendMedia = async (msg: Mensaje | null, phoneId: string, metaApi: A
     const { data } = await metaApi.post(`/${phoneId}/messages`, mediaObj);
     const messageID = data.messages[0].id;
 
-    await generalMessages.create({
+    await generalMessage.create({
       data: {
         mensaje: msg?.cuerpo || null,
         origen: 'BOT',
         messageID,
         appID: aplication.id,
-        empresaId: conversation!.Empresas.id,
+        empresaId: conversation!.empresa.id,
         idOrigen: msg!.id,
         recipientId:  client.id,
         status: 'ENVIADO',

@@ -1,7 +1,7 @@
 import { prisma } from '../db/config';
 
 export const savePollResults = async (response: string, client: any) => {
-  const { conversacion, encuestas, mensaje, cliente } = prisma;
+  const { conversacion, encuesta, mensaje, cliente } = prisma;
 
   try {
     const clientConversation = await conversacion.findUnique({
@@ -39,7 +39,7 @@ export const savePollResults = async (response: string, client: any) => {
     });
 
     if (clientConversation?.categoria === 'POLL') {
-      await encuestas.create({
+      await encuesta.create({
         data: {
           clienteId: client.id,
           nombreCliente: client.nombre,

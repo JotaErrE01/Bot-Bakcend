@@ -7,7 +7,7 @@ import { IGetDataMessage } from './messages/getDataMessage';
 
 
 export const connectToOtherBot = async (msg: Mensaje, client: Cliente, metaApi: AxiosInstance, botMessageData: any, phoneId: string, res: Response, aplication: App, dataMsg: IGetDataMessage) => {
-  const { conversacion, cliente, generalMessages } = prisma;
+  const { conversacion, cliente, generalMessage } = prisma;
 
   try {
 

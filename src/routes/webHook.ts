@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { MetaApi } from '../api';
-import { messages, taskController } from '../controllers';
+import { messages, taskController, socketEventsController } from '../controllers';
 
 const router = Router();
 
@@ -14,9 +14,6 @@ router.post('/revalidateAdminChats', messages.revalidateAdminChats);
 router.get( '/:webHookApi', messages.validarWebHookToken);
 
 router.post( '/sendMessage', messages.sendMessage);
-
-// controllar envios de mesnajes y responderlos
-router.post( '/:webHookApi', messages.messagesController );
 
 router.post( '/send', async (req, res) => {
   try {
@@ -41,6 +38,11 @@ router.post( '/send', async (req, res) => {
   }
   
 });
+
+router.post('/createSocketEvent', socketEventsController.createSocketEvent);
+
+// controllar envios de mesnajes y responderlos
+router.post( '/:webHookApi', messages.messagesController );
 
 router.delete( '/:taskId', taskController.deleteCronTask );
 

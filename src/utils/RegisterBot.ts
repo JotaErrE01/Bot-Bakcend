@@ -4,9 +4,9 @@ import { Response } from 'express';
 
 export const RegisterBot = async (empresaId: string, metaApi: AxiosInstance, phoneId: string, botMessageData: any, waId: string, res: Response) => {
   try {
-    const { cliente, conversacion, mensaje, paises } = prisma;
+    const { cliente, conversacion, mensaje, pais } = prisma;
 
-    const countries = await paises.findMany({
+    const countries = await pais.findMany({
       where: {
         isDeleted: false
       }
