@@ -13,11 +13,34 @@ export const chatTimeOut = (io: SocketServer, aplication: App, dataMsg: Messages
   const minutes = timing * 60000;
   // const stopTime = new Date(createdAt.getTime() + (timing * 1000));
   const stopTime = new Date(createdAt.getTime() + minutes);
+  const stopTime5MinutesBefore = new Date(createdAt.getTime() + (minutes - (5 * 60000)));
   const cronString = `${stopTime.getSeconds()} ${stopTime.getMinutes()} ${stopTime.getHours()} ${stopTime.getDate()} ${stopTime.getMonth() + 1} *`;
+  const cronString5MintesBefore = `${stopTime5MinutesBefore.getSeconds()} ${stopTime5MinutesBefore.getMinutes()} ${stopTime5MinutesBefore.getHours()} ${stopTime5MinutesBefore.getDate()} ${stopTime5MinutesBefore.getMonth() + 1} *`;
 
   const task = cron.getTasks().get(client.id.toString());
+  const taskBeforeStop = cron.getTasks().get(`${client.id.toString()}-5min`);
+  if (taskBeforeStop) taskBeforeStop.stop();
   if (task) task.stop();
 
+  const jobBeforeStop = cron.schedule(cronString5MintesBefore, async () => {
+    const dataMessage = {
+      "messaging_product": "whatsapp",
+      "to": `${dataMsg.from}`,
+      "type": "text",
+      "text": {
+        body: 'El chat se cerrara en 5 minutos. Si desea continuar con la conversación, por favor conteste este mensaje.',
+      },
+    };
+  
+    const metaApi = MetaApi.createApi(aplication.token!);
+    await metaApi.post(`/${aplication.phoneNumberId}/messages`, dataMessage);
+
+    jobBeforeStop.stop();
+  }, {
+    scheduled: true,
+    timezone: 'America/Guayaquil',
+    name: `${client.id.toString()}-5min`
+  });
 
   const job = cron.schedule(cronString, async () => {
     await sendStopMessage(dataMsg, aplication, client, asesor);
@@ -37,7 +60,7 @@ const sendStopMessage = async (dataMsg: Messages.IGetDataMessage, aplication: Ap
     "to": `${dataMsg.from}`,
     "type": "text",
     "text": {
-      body: 'El tiempo de respuesta ha finalizado. Si desea continuar con la conversación, por favor escriba "Hola"',
+      body: 'El tiempo de respuesta ha finalizado. Sera redireccionado a nuestro bot de atención al cliente.',
     },
   };
 
