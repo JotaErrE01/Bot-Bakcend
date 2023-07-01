@@ -160,7 +160,7 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
       //   }
       // });
 
-      chatTimeOut(io, aplication, dataMsg, chat.createdAt, chat.cliente, department?.chatTiming, asesor!);
+      chatTimeOut(io, aplication, dataMsg, chat.createdAt, chat.cliente, department?.chatTiming);
 
       io.to(client.chatAsesorId.toString()).emit('personal-message', serializeBigInt(chat)); //!
 
@@ -325,7 +325,7 @@ export const agentLogic = async (client: Cliente, aplication: App, io: SocketSer
         //   }
         // });
 
-        chatTimeOut(io, aplication, dataMsg, chat.createdAt, chat.cliente, department?.chatTiming, asesor);
+        chatTimeOut(io, aplication, dataMsg, chat.createdAt, chat.cliente, department?.chatTiming);
 
         io.to(asesor.id.toString()).emit('personal-message', serializeBigInt(chat));
         io.to(asesor.id.toString()).emit('supervisor-message', serializeBigInt(chat));

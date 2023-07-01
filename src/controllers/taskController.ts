@@ -5,17 +5,15 @@ import cron from 'node-cron';
 export const deleteCronTask = async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
-    console.log({ taskId });
     
     if (!taskId) return res.status(400).json({ msg: 'No se envió el id de la tarea' });
 
+    const task5minBefore = cron.getTasks().get(`${taskId}-5min`);
     const task = cron.getTasks().get(taskId);
-
-    console.log({ task });
-    
 
     if (!task) return res.status(200).json({ msg: 'No se encontró la tarea' });
 
+    task5minBefore?.stop();
     task.stop();
 
     return res.status(200).json({ msg: 'Tarea eliminada' });

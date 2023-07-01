@@ -6,7 +6,7 @@ import { prisma } from '../db/config';
 import { MetaApi } from "../api";
 import { Messages } from ".";
 
-export const chatTimeOut = (io: SocketServer, aplication: App, dataMsg: Messages.IGetDataMessage, startDate: Date, client: Cliente, timing: number = 5, asesor?: Usuario) => {
+export const chatTimeOut = (io: SocketServer, aplication: App, dataMsg: Messages.IGetDataMessage, startDate: Date, client: Cliente, timing: number = 5, isAgent?: boolean) => {
   // get the current date with javascript
   const createdAt = new Date(startDate);
 
@@ -22,28 +22,30 @@ export const chatTimeOut = (io: SocketServer, aplication: App, dataMsg: Messages
   if (taskBeforeStop) taskBeforeStop.stop();
   if (task) task.stop();
 
-  const jobBeforeStop = cron.schedule(cronString5MintesBefore, async () => {
-    const dataMessage = {
-      "messaging_product": "whatsapp",
-      "to": `${dataMsg.from}`,
-      "type": "text",
-      "text": {
-        body: 'El chat se cerrara en 5 minutos. Si desea continuar con la conversación, por favor conteste este mensaje.',
-      },
-    };
+  if(isAgent) {
+    const jobBeforeStop = cron.schedule(cronString5MintesBefore, async () => {
+      const dataMessage = {
+        "messaging_product": "whatsapp",
+        "to": `${dataMsg.from}`,
+        "type": "text",
+        "text": {
+          body: 'El chat se cerrara en 5 minutos. Si desea continuar con la conversación, por favor conteste este mensaje.',
+        },
+      };
+    
+      const metaApi = MetaApi.createApi(aplication.token!);
+      await metaApi.post(`/${aplication.phoneNumberId}/messages`, dataMessage);
   
-    const metaApi = MetaApi.createApi(aplication.token!);
-    await metaApi.post(`/${aplication.phoneNumberId}/messages`, dataMessage);
-
-    jobBeforeStop.stop();
-  }, {
-    scheduled: true,
-    timezone: 'America/Guayaquil',
-    name: `${client.id.toString()}-5min`
-  });
+      jobBeforeStop.stop();
+    }, {
+      scheduled: true,
+      timezone: 'America/Guayaquil',
+      name: `${client.id.toString()}-5min`
+    });
+  }
 
   const job = cron.schedule(cronString, async () => {
-    await sendStopMessage(dataMsg, aplication, client, asesor);
+    await sendStopMessage(dataMsg, aplication, client);
     io.emit('chatTimeOut', serializeBigInt({ clienteId: client.id }));
     job.stop();
   }, {
@@ -53,8 +55,8 @@ export const chatTimeOut = (io: SocketServer, aplication: App, dataMsg: Messages
   });
 }
 
-const sendStopMessage = async (dataMsg: Messages.IGetDataMessage, aplication: App, client: Cliente, asesor?: Usuario): Promise<boolean> => {
-  const { cliente, usuario } = prisma;
+const sendStopMessage = async (dataMsg: Messages.IGetDataMessage, aplication: App, client: Cliente): Promise<boolean> => {
+  const { cliente, usuario, generalMessage } = prisma;
   const dataMessage = {
     "messaging_product": "whatsapp",
     "to": `${dataMsg.from}`,
@@ -74,7 +76,6 @@ const sendStopMessage = async (dataMsg: Messages.IGetDataMessage, aplication: Ap
     });
 
     if (!clientDb || clientDb.isDeleted) throw new Error('Cliente no encontrado');
-    // if (!client.isChating) throw new Error('El cliente no está chateando');
 
     await cliente.update({
       where: {
@@ -101,24 +102,21 @@ const sendStopMessage = async (dataMsg: Messages.IGetDataMessage, aplication: Ap
         }
       });
     }
-    // await usuario.update({
-    //   where: {
-    //     id: asesor.id,
-    //   },
-    //   data: {
-    //     quantityChats: {
-    //       decrement: 1,
-    //     }
-    //   }
-    // });
-    // if (asesor) {
-    // }
-    // if (chat.asesorId) {
-    // }
 
     const { data } = await metaApi.post(`/${aplication.phoneNumberId}/messages`, dataMessage);
 
     // TODO: Guardar el mensaje en la base de datos
+    // await generalMessage.create({
+    //   data: {
+    //     mensaje: dataMessage.text.body,
+    //     appID: aplication.id,
+    //     empresaId: aplication.empresaId,
+    //     origen: 'BOT',
+    //     idOrigen: 1,
+    //     status: 'ENVIADO',
+    //     messageID: data.,
+    //   }
+    // });
 
     return true;
   } catch (error) {

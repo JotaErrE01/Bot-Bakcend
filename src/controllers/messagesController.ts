@@ -159,11 +159,15 @@ export const messagesController = async (req: Request, res: Response) => {
         empresaId: aplication.empresaId,
         idOrigen: client.id,
         origen: 'CLIENTE',
-        mensaje: text,
+        // mensaje: text,
         status: 'ENVIADO',
         updatedAt: new Date(),
         // createdAt: new Date(),
         messageID: messageId,
+        mensaje: dataMessage.mediaData?.caption || dataMessage.text || '',
+        recipientId: null,
+        recipientWhatsapp: aplication.empresa?.whatsapp,
+        isDeleted: false,
       }
     });
 
