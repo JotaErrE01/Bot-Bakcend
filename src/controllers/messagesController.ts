@@ -17,7 +17,14 @@ export const validarWebHookToken = async (req: Request, res: Response) => {
   const { webHookApi } = req.params;
 
   try {
+    console.log('validando token');
+    console.log(token?.toString());
+    
+    
     const application = await app.findUnique({ where: { webHookToken: token?.toString() } });
+
+    console.log({ application });
+    
 
     if (!application || application.isDeleted) return res.status(401).json({ msg: 'Access Denied' });
 
