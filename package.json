@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "tsc && concurrently \"nodemon dist/app.js\" \"tsc -w\"",
     "serve": "./ngrok http 80",
-    "build": "tsc",
+    "build": "npx tsc",
     "start": "node dist/app.js"
   },
   "keywords": [],
